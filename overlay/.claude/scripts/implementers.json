@@ -1,0 +1,8 @@
+{
+  "_comment": "Headless implementer CLIs for delegate-task.sh and /ejadtask. {prompt} is replaced by the task text. Tools are allowed per CLI through scoped rules, never blanket auto-approve: Copilot by --allow-tool/--deny-tool here; Kilo and Antigravity by the allow rules in their own settings files (see the README). Default is opencode (OpenCode Go), whose policy is the ejad-approvals plugin.",
+  "default": "opencode",
+  "opencode": ["opencode", "run", "-m", "opencode-go/kimi-k2.7-code", "{prompt}"],
+  "copilot": ["copilot", "-p", "{prompt}", "-s", "--allow-tool=write", "--allow-tool=shell(git status)", "--allow-tool=shell(git diff)", "--allow-tool=shell(git add)", "--allow-tool=shell(git commit)", "--allow-tool=shell(node)", "--allow-tool=shell(npx)", "--deny-tool=shell(git push)"],
+  "kilo": ["kilo", "run", "{prompt}"],
+  "antigravity": ["agy", "-p", "{prompt}"]
+}

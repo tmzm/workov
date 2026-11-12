@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# ejad-fleet installer: worker-fleet + the Ejad layer (GitLab MR / Plane / Ejad HR landing, OpenCode Go models,
+# permission approvals, mockup tab, Copilot/Kilo/Antigravity implementers) + the /ejadtask command.
+#
+#   bash install.sh <target-repo> --worker-fleet <path-or-git-url> [--no-command] [--no-setup]
+#
+# Everything installed into the target repo stays out of git (written to .git/info/exclude); tracked files the
+# worker-fleet installer would replace are restored. Requires: git, bash, node, python3; opencode for the fleet.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+TARGET=""; WF=""; DO_COMMAND=1; DO_SETUP=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --worker-fleet) WF="$2"; shift 2 ;;
+    --no-command) DO_COMMAND=0; shift ;;
+    --no-setup) DO_SETUP=0; shift ;;
+    -h|--help) sed -n 2,9p "$0"; exit 0 ;;
+    *) TARGET="$1"; shift ;;
+  esac
+done
+[ -n "$TARGET" ] && [ -d "$TARGET/.git" -o -f "$TARGET/.git" ] || { echo "usage: bash install.sh <target-repo> --worker-fleet <path-or-git-url>" >&2; exit 2; }
+[ -n "$WF" ] || { echo "missing --worker-fleet <path-or-git-url> (worker-fleet itself is not bundled)" >&2; exit 2; }
+TARGET="$(cd "$TARGET" && pwd)"
+for bin in git node python3; do command -v "$bin" >/dev/null || { echo "missing $bin" >&2; exit 2; }; done
+
+# 1. worker-fleet source (a local folder or a git URL)
+if [ -d "$WF" ]; then
+  WF_DIR="$(cd "$WF" && pwd)"
+  [ -f "$WF_DIR/.claude/scripts/install.sh" ] || WF_DIR="$WF_DIR/worker-fleet"
+else
+  WF_DIR="$(mktemp -d)/worker-fleet"; git clone --depth 1 "$WF" "$WF_DIR"
+fi
+[ -f "$WF_DIR/.claude/scripts/install.sh" ] || { echo "not a worker-fleet checkout: $WF_DIR" >&2; exit 2; }
+
+# 2. install worker-fleet, then restore any tracked file it replaced (the team's files win)
+bash "$WF_DIR/.claude/scripts/install.sh" "$TARGET"
+CHANGED="$(git -C "$TARGET" diff --name-only)"
+if [ -n "$CHANGED" ]; then
+  echo "restoring tracked files the installer replaced:"; echo "$CHANGED" | sed 's/^/  /'
+  echo "$CHANGED" | while read -r f; do git -C "$TARGET" checkout -- "$f"; done
+fi
+
+# 3. models and landing (OpenCode Go by default; edit specs/worker-fleet.config.json afterwards to change)
+if [ "$DO_SETUP" = 1 ]; then
+  ( cd "$TARGET" && node -e '
+    const fs = require("fs"); const f = "specs/worker-fleet.config.json"; const c = JSON.parse(fs.readFileSync(f, "utf8"));
+    const oc = { router: "opencode-go/glm-5.3", worker: "opencode-go/kimi-k2.7-code", teammate: "opencode-go/kimi-k2.7-code",
+      reviewer: "opencode-go/deepseek-v4-pro", reproducer: "opencode-go/deepseek-v4-pro", tester: "opencode-go/glm-5.3-flash",
+      merger: "opencode-go/glm-5.3-flash", checker: "opencode-go/glm-5.3-flash", watchdog: "opencode-go/glm-5.3-flash" };
+    for (const [role, m] of Object.entries(oc)) c.models[role].opencode = { model: m };
+    c.models.router.claude = { model: "sonnet", effort: "medium" };
+    c.models.reviewer.delegateCli = "none"; c.models.worker.delegateCli = "none";
+    fs.writeFileSync(f, JSON.stringify(c, null, 2) + "\n");' \
+    && python3 .claude/scripts/apply-setup.py --preset custom --harness opencode --landing pr --max-workers 2 \
+         --main-port 4200 --dashboard on --tunnel local --budget-usd 3 | tail -5 )
+fi
+
+# 4. the Ejad layer: overlay files, then patches (after setup, which regenerates agent files)
+cp -R "$HERE/overlay/." "$TARGET/"
+for p in ejad-agents ejad-worker ejad-dashboard ejad-delegate; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
+
+# setup regenerates agent files: restore any tracked file again, so the team's files always win
+CHANGED="$(git -C "$TARGET" diff --name-only)"
+[ -z "$CHANGED" ] || echo "$CHANGED" | while read -r f; do git -C "$TARGET" checkout -- "$f"; done
+
+# 5. keep it all out of git
+EXCLUDE="$(git -C "$TARGET" rev-parse --git-common-dir)/info/exclude"
+case "$EXCLUDE" in /*|?:*) ;; *) EXCLUDE="$TARGET/$EXCLUDE" ;; esac
+grep -q "# ejad-fleet" "$EXCLUDE" 2>/dev/null || cat "$HERE/exclude.txt" >> "$EXCLUDE"
+
+# 6. the /ejadtask command and the personal profile
+if [ "$DO_COMMAND" = 1 ]; then
+  mkdir -p "$HOME/.claude/commands"
+  cp "$HERE/commands/ejadtask.md" "$HOME/.claude/commands/ejadtask.md"
+  [ -f "$HOME/.claude/ejadtask.json" ] || { cp "$HERE/profile.example.json" "$HOME/.claude/ejadtask.json"; NEED_PROFILE=1; }
+fi
+
+echo
+echo "ejad-fleet installed into $TARGET"
+[ "${NEED_PROFILE:-0}" = 1 ] && echo "  -> fill in ~/.claude/ejadtask.json (your Plane / GitLab / Ejad HR ids and reviewers)"
+echo "  -> set Windows user env vars HR_EMAIL, HR_PASS, PLANE_API_KEY; log in with glab for your GitLab host"
+echo "  -> run: python3 .claude/scripts/selftest.py   (inside the target repo)"
+echo "  -> read README.md in ejad-fleet for the daily workflow"

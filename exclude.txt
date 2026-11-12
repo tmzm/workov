@@ -1,0 +1,25 @@
+
+# ejad-fleet (worker-fleet + Ejad layer; local only, never committed)
+job/
+__pycache__/
+.worker-fleet-backup/
+.claude/agents/
+.claude/dashboard/
+.claude/scripts/
+.claude/skills/
+.claude/settings.json
+.claude/worker-fleet.version
+.opencode/agents/checker.md
+.opencode/agents/merger.md
+.opencode/agents/reproducer.md
+.opencode/agents/router.md
+.opencode/agents/teammate.md
+.opencode/agents/tester.md
+.opencode/agents/watchdog.md
+.opencode/agents/worker.md
+.opencode/plugins/
+.agents/skills
+opencode.json
+specs/worker-fleet.config.json
+specs/tickets/*/delivery/
+.delivery/
