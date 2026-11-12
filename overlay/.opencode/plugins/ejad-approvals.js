@@ -29,6 +29,7 @@ const ALLOW_SHELL = [
   /^\s*(npx|pnpm|npm)\s+(run|test|exec|ng|prettier|eslint|playwright|vitest|tsc)\b/i,
   /^\s*(python3?|bash)\s+\.claude\/scripts\//i,
   /^\s*(ls|cat|head|tail|wc|grep|rg|find|pwd|echo|date|mkdir|cp|mv|touch|sed\s+-n|diff|sort|uniq|which|test)\b/i,
+  /^\s*(Get-Command|Test-Path|Get-ChildItem|Get-Content|Get-Location|Select-String|where(\.exe)?|command\s+-v|type)\b/i, // read-only lookups
   /^\s*curl\s+-s\s+http:\/\/(localhost|127\.0\.0\.1)/i,
 ];
 
