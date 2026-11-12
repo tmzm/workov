@@ -143,8 +143,11 @@ ${evalPanel}`);
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (dec === 'allow' ? ' primary' : '');
             b.textContent = dec === 'allow' ? 'Allow' : 'Deny';
             b.onclick = async () => {
+              if (!getStoredToken()) { openAuthModal(); return; }
               b.disabled = true;
-              await fetch('/api/action', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ action: 'decide_permission', id: r.id, decision: dec }) });
+              const res = await fetch('/api/action', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ action: 'decide_permission', id: r.id, decision: dec }) });
+              if (res.status === 401) { dropRejectedToken(res); openAuthModal(); b.disabled = false; return; }
+              if (!res.ok) { b.disabled = false; announce('Could not save the decision (HTTP ' + res.status + ').'); return; }
               ejadPollPermissions();
             };
             bar.append(b, ' ');
