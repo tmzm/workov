@@ -58,7 +58,7 @@ fi
 
 # 4. the Ejad layer: overlay files, then patches (after setup, which regenerates agent files)
 cp -R "$HERE/overlay/." "$TARGET/"
-for p in ejad-agents ejad-worker ejad-dashboard ejad-delegate; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
+for p in ejad-agents ejad-worker ejad-dashboard ejad-delegate ejad-windows; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
 
 # setup regenerates agent files: restore any tracked file again, so the team's files always win
 CHANGED="$(git -C "$TARGET" diff --name-only)"
