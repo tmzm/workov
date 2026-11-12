@@ -35,7 +35,7 @@ const ALLOW_SHELL = [
 
 function mainRoot(cwd) {
   try {
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd, encoding: 'utf8' }).trim();
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd, encoding: 'utf8', windowsHide: true }).trim();
     return path.dirname(common);
   } catch {
     return cwd;
@@ -61,7 +61,9 @@ async function askOwner(root, event) {
   fs.writeFileSync(file, JSON.stringify({ id, status: 'pending', agent: event.agent || null, action: event.action, resources, cwd: process.cwd(), createdAt: new Date().toISOString() }, null, 2));
   const summary = `${event.agent || 'agent'} wants ${event.action}: ${resources.join(' | ').slice(0, 160)}`.replace(/'/g, '');
   try {
-    spawn('bash', ['.claude/scripts/notify.sh', 'needs_human', `Permission needed: ${summary}`], { cwd: root, stdio: 'ignore', detached: true }).unref();
+    if (fs.existsSync(path.join(root, '.claude', 'scripts', 'notify.sh'))) {
+      spawn('bash', ['.claude/scripts/notify.sh', 'needs_human', `Permission needed: ${summary}`], { cwd: root, stdio: 'ignore', windowsHide: true }).unref();
+    }
   } catch {
     /* the dashboard is the fallback channel */
   }
@@ -82,8 +84,13 @@ export default define({
   id: 'ejad-approvals',
   async setup(ctx) {
     const root = mainRoot(process.cwd());
+    // Active in a worker-fleet repo, or when /ejadtask starts the provider (EJAD_APPROVALS=1, or =auto to allow
+    // everything that is not denied). Ordinary OpenCode sessions elsewhere are untouched.
+    const mode = process.env.EJAD_APPROVALS || (fs.existsSync(path.join(root, 'specs', 'worker-fleet.config.json')) ? '1' : '');
+    if (!mode) return;
     await ctx.permission.hook('evaluate', async (event) => {
       const verdict = policy(String(event.action || ''), (event.resources || []).map(String));
+      if (verdict === 'ask' && mode === 'auto') { event.effect = 'allow'; return; }
       if (verdict !== 'ask') {
         event.effect = verdict;
         if (verdict === 'deny') event.message = 'Denied by the Ejad policy (push, force, deletes outside the worktree, outside network, new dependencies).';

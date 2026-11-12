@@ -74,6 +74,13 @@ if [ "$DO_COMMAND" = 1 ]; then
   mkdir -p "$HOME/.claude/commands"
   cp "$HERE/commands/ejadtask.md" "$HOME/.claude/commands/ejadtask.md"
   [ -f "$HOME/.claude/ejadtask.json" ] || { cp "$HERE/profile.example.json" "$HOME/.claude/ejadtask.json"; NEED_PROFILE=1; }
+  # The approvals plugin, for /ejadtask's headless runs in any repo. Inactive unless EJAD_APPROVALS is set (or the
+  # repo has worker-fleet), so ordinary OpenCode sessions are untouched.
+  mkdir -p "$HOME/.config/opencode/plugins"
+  cp "$HERE/overlay/.opencode/plugins/ejad-approvals.js" "$HOME/.config/opencode/plugins/ejad-approvals.js"
+  # Headless runs in repos without worker-fleet use ejad-land.cjs from here.
+  mkdir -p "$HOME/.claude/ejad-fleet"
+  cp "$HERE/overlay/.claude/scripts/ejad-land.cjs" "$HOME/.claude/ejad-fleet/ejad-land.cjs"
 fi
 
 echo

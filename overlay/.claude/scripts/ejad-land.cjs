@@ -30,7 +30,7 @@ const HR = PROFILE.ejadHrApi || 'https://hr.ejad.net/api/v1';
 const [mode, a1, a2] = process.argv.slice(2);
 const DRY = process.argv.includes('--dry-run');
 
-const sh = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const sh = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }).trim();
 function env(name) {
   if (process.env[name]) return process.env[name];
   if (process.platform !== 'win32') return '';
@@ -81,7 +81,7 @@ function ticket(nnn) {
   const plane = (/\*\*Plane:\*\*\s*([A-Z][A-Z0-9]*-\d+)/.exec(rd) || [])[1];
   if (!plane) throw new Error(`rd.md of ${dir} has no "**Plane:** <IDENT>-<n>" line`);
   return {
-    root, packRoot, plane,
+    root, packRoot, screenDir: path.join(packRoot, 'delivery'), plane,
     hrTask: (/\*\*Ejad HR task:\*\*\s*([0-9a-f-]{36})/.exec(rd) || [])[1] || null,
     title: read('delivery/mr-title.txt').trim() || `feat: ${((/^#\s+(.+)$/m.exec(rd) || [])[1] || dir).trim()}`,
     body: read('delivery/mr.md') || read('results.md') || `Ticket ${dir}.`,
@@ -96,7 +96,7 @@ async function uploadScreens(gl, t, body) {
     if (!body.includes(ref)) continue;
     if (DRY) { log('[dry-run] upload', ref); continue; }
     const form = new FormData();
-    form.append('file', new Blob([fs.readFileSync(path.join(t.packRoot, 'delivery', ref))]), f);
+    form.append('file', new Blob([fs.readFileSync(path.join(t.screenDir, ref))]), f);
     const up = await req(`${gl.api}/uploads`, { method: 'POST', headers: { 'PRIVATE-TOKEN': gl.token }, body: form });
     body = body.split(ref).join(up.url);
     log('ok upload', f);
@@ -156,8 +156,21 @@ async function ejadHr(t, mrUrl, title) {
   await write('Ejad HR comment', () => req(`${HR}/tasks/${id}/comments`, json('POST', H, { body: `${t.tracker}\nMR: ${mrUrl}`.slice(0, 4000) })));
 }
 
-async function land(nnn, branch) {
-  const t = ticket(nnn);
+// A headless delivery pack (.delivery/<task>/, from /ejadtask): same shape as a ticket's delivery folder.
+function pack(dir, planeId) {
+  const read = (f) => (fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f), 'utf8') : '');
+  const sdir = path.join(dir, 'screens');
+  return {
+    root: dir, screenDir: dir, plane: planeId, hrTask: null,
+    title: read('mr-title.txt').trim(), body: read('mr.md'), tracker: read('tracker.md').trim(),
+    screens: fs.existsSync(sdir) ? fs.readdirSync(sdir).filter((f) => /\.(png|jpe?g)$/i.test(f)).sort() : [],
+  };
+}
+
+// Push and open or update the MR. draft=true (the fleet's merger): nothing is marked delivered yet;
+// Claude's review then runs `deliver`, which marks it ready and moves Plane and Ejad HR.
+async function openMr(t, branch, draft) {
+  if (!t.title || !t.body) throw new Error('the delivery pack has no mr-title.txt or mr.md');
   const gl = gitlab();
   await write(`git push origin ${branch}`, () => sh('git', ['push', 'origin', branch]));
   const body = await uploadScreens(gl, t, t.body);
@@ -165,23 +178,41 @@ async function land(nnn, branch) {
   const fields = { title: t.title, description: body, assignee_ids: [ME.gitlab], reviewer_ids: reviewer ? [reviewer] : [], remove_source_branch: false };
   let mr = await mrFor(gl, branch);
   if (mr && mr.state === 'opened') {
-    await write(`update MR !${mr.iid}`, async () => (mr = await req(`${gl.api}/merge_requests/${mr.iid}`, json('PUT', { 'PRIVATE-TOKEN': gl.token }, { ...fields, draft: false }))));
+    await write(`update MR !${mr.iid}${draft ? ' (draft)' : ' (ready)'}`, async () => (mr = await req(`${gl.api}/merge_requests/${mr.iid}`, json('PUT', { 'PRIVATE-TOKEN': gl.token }, { ...fields, draft }))));
   } else {
-    await write('create MR', async () => (mr = await req(`${gl.api}/merge_requests`, json('POST', { 'PRIVATE-TOKEN': gl.token }, { ...fields, source_branch: branch, target_branch: 'main' }))));
+    await write(`create MR${draft ? ' (draft)' : ''}`, async () => (mr = await req(`${gl.api}/merge_requests`, json('POST', { 'PRIVATE-TOKEN': gl.token }, { ...fields, draft, source_branch: branch, target_branch: 'main' }))));
   }
-  const url = mr?.web_url || '(dry-run MR url)';
+  return mr?.web_url || '(dry-run MR url)';
+}
+
+async function land(nnn, branch) {
+  const url = await openMr(ticket(nnn), branch, true);
+  log(`MR_URL ${url}`);
+}
+
+async function deliver(t, branch) {
+  const url = await openMr(t, branch, false);
   await plane(t, url);
   await ejadHr(t, url, t.title);
   log(`MR_URL ${url}`);
 }
 
 (async () => {
+  const opt = (name) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : null; };
   if (mode === 'land' && a1 && a2) return land(a1, a2);
+  if (mode === 'deliver' && a1 && /^\d+$/.test(a1) && a2) return deliver(ticket(a1), a2);
+  if (mode === 'deliver' && a1 && opt('--pack') && opt('--plane')) return deliver(pack(opt('--pack'), opt('--plane')), a1);
   if (mode === 'status' && a1) {
     const mr = await mrFor(gitlab(), a1);
     return log(mr ? mr.state : 'none');
   }
-  console.error('usage: ejad-land.cjs land <NNN> <branch> [--dry-run] | status <branch>');
+  console.error([
+    'usage: ejad-land.cjs land <NNN> <branch>                         (fleet merger: push + draft MR)',
+    '       ejad-land.cjs deliver <NNN> <branch>                      (after review: MR ready, Plane, Ejad HR)',
+    '       ejad-land.cjs deliver <branch> --pack <dir> --plane <ID>  (headless delivery pack)',
+    '       ejad-land.cjs status <branch>',
+    '       add --dry-run to print the writes without doing them',
+  ].join('\n'));
   process.exit(2);
 })().catch((e) => {
   console.error(`ejad-land: ${e.message}`);

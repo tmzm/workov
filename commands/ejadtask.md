@@ -1,6 +1,6 @@
 ---
 description: Prepare a task of the current project for another AI to implement cheaply and well — sync Plane/Ejad HR, pick and claim a task, a short decision plan, mockup, draft MR and an implementation prompt; later review the result and deliver. Implements itself only when I ask.
-argument-hint: "[task id (e.g. ABC-42)] [headless | with opencode|copilot|kilo|antigravity | sync | plan only | no mockup | claude mockup | approve | review | deliver | implement | other changes]"
+argument-hint: "[task id (e.g. ABC-42)] [headless | with opencode|copilot|kilo|antigravity | auto | manual | sync | plan only | no mockup | claude mockup | approve | review | deliver | implement | other changes]"
 ---
 
 # /ejadtask — Claude plans and reviews, another AI implements (Plane + GitLab + Ejad HR)
@@ -214,10 +214,10 @@ session, or with a fresh Planner given a short list. No second round unless a fi
    assigned to me; comment the MR link on the Plane item and the Ejad HR task.
 9. **Approval gate.** Show me the mockup (if any) and the plan's decisions and gaps; apply my changes; record
    "approved by <my name> on <date>" in the plan.
-10. **Handoff and report.** Write the implementation prompt (`handoff-<task>.md` in the scratchpad) and end with the
-    **Final result**. With `with <cli>` in my input (opencode, copilot, kilo, antigravity), also start that CLI in the
-    background in the repo with the prompt, using the command line from `.claude/scripts/implementers.json` if the
-    repo has it (else `opencode run "<prompt>"`), so I'm notified when it finishes; then run `review` on its result.
+10. **Handoff and run.** Write the implementation prompt (`handoff-<task>.md` in the scratchpad). Then, unless my
+    input says `manual` (I paste the prompt myself), **run the provider yourself** as described in "Running the
+    provider" below, and continue straight into `review` and `deliver` when it finishes. With `manual`, end with the
+    **Final result** instead.
     The prompt tells the implementer to:
     - read the repo's rules file and the plan; follow the phases and steps in order: tests first, copy the named model
       file, run each step's check;
@@ -232,6 +232,38 @@ session, or with a fresh Planner given a short list. No second round unless a fi
     Paste the **Delivery pack** spec from this command into the prompt so the implementer doesn't depend on the plan
     alone.
 
+## Running the provider (headless, default after the approval gate)
+
+Claude plans, checks and delivers; the provider only implements. You start it, answer its permission requests, and
+loop it on the review's findings, without me copying anything.
+
+1. **Which provider:** `with <cli>` from my input (`opencode`, `copilot`, `kilo`, `antigravity`), else `default` in
+   `.claude/scripts/implementers.json` if the repo has it, else OpenCode Go (`opencode-go/kimi-k2.7-code`).
+2. **Prepare the repo:** make sure `.git/info/exclude` has `job/` and `.delivery/`; the checkout is on the task's
+   branch and clean (else ask me).
+3. **Start it in the background** (Bash `run_in_background`, which never opens a window), in the repo root, with the
+   handoff prompt as the message. Environment `EJAD_APPROVALS=1` (or `auto`, below). Command lines:
+   - OpenCode: `opencode run --standalone --agent build -m <model> "<prompt>"`
+   - Copilot / Kilo / Antigravity: the list in `.claude/scripts/implementers.json` (`{prompt}` replaced); without that
+     file: `copilot -p "<prompt>" -s --allow-tool=write --deny-tool="shell(git push)"`, `kilo run "<prompt>"`,
+     `agy -p "<prompt>"`.
+4. **Permissions (default: you approve).** OpenCode runs the `ejad-approvals` plugin (installed by ejad-fleet in
+   `~/.config/opencode/plugins/`): safe actions are allowed and dangerous ones denied by its policy; anything else
+   becomes a file `job/permissions/<id>.json` with `"status": "pending"`, and the provider waits (15 minutes, then
+   deny). Watch for them with the Monitor tool (an until-loop on new pending files; it costs nothing while waiting).
+   For each: allow if it is plainly part of the plan (build, test, local file work); deny anything outside the repo,
+   network beyond localhost, pushes, deletes, new packages, credentials; when unsure, ask me with one short question.
+   Write the decision into the file (`"status": "allow"` or `"deny"`). Copilot, Kilo and Antigravity have no
+   approval hook: they get only their scoped allow lists, and a disallowed tool makes them stop and report.
+5. **`auto` (optional, from my input): permissions auto-approved.** OpenCode: `EJAD_APPROVALS=auto` and `--auto` — the
+   plugin's deny list (push, force, deletes outside the repo, outside network, new packages) still applies. Copilot:
+   `--allow-all-tools --deny-tool="shell(git push)"`. Kilo: `--auto`. Antigravity: `--dangerously-skip-permissions`.
+   Say in one line that auto is on and which provider runs, before starting.
+6. **When it exits** (you're notified): run Part C. If there are findings, start the same provider again with the fix
+   prompt (at most 2 fix rounds; OpenCode can continue its session with `--continue`). Then Part D. Ask me only for
+   the hours, for an unsure permission, or if the provider fails twice.
+7. **Report** in 5 lines at the end: provider, rounds, checks, MR, Plane/Ejad HR state.
+
 ## Part C — review the implementer's work (`review`)
 
 1. Check the basics cheaply yourself: `git log --oneline origin/<default>..HEAD`, `git diff --stat`, then run lint,
@@ -245,7 +277,10 @@ session, or with a fresh Planner given a short list. No second round unless a fi
 
 ## Part D — deliver (`deliver`)
 
-Mechanical, from the delivery pack, with one script in the scratchpad (no re-reading the code, no re-writing texts):
+Mechanical, from the delivery pack (no re-reading the code, no re-writing texts). Steps 1–4 are one call, run from
+the repo root with `.claude/scripts/ejad-land.cjs` if the repo has it, else `~/.claude/ejad-fleet/ejad-land.cjs`:
+`node <ejad-land.cjs> deliver <branch> --pack .delivery/<task id> --plane <IDENT>-<n>` (run it with `--dry-run`
+first; show me only a failure). Without either file, one script in the scratchpad:
 1. Rebase on the latest default branch if needed (ask before any force push) and push.
 2. Upload every `screens/*.png` to GitLab, replace each `screens/NN-<name>.png` link in `mr.md` with the uploaded
    URL.
@@ -296,11 +331,13 @@ Part A changes:
   `opencode --agent router` in the repo (or `claude --agent router --name router --permission-mode auto`), and the
   dashboard URL `http://localhost:3080`.
 
-After the fleet lands it (ticket `in-review`, MR open):
-- **`review`:** Claude's final review of the MR diff (Part C, step 2). Findings go to
-  `specs/tickets/NNN-<slug>/review.md`; if there are any, add a `## Rework` section to `rd.md` that points to it, set
-  the ticket back to `ready`, and the router re-dispatches a worker with them.
-- **`deliver`:** landing already happened; only show me the days from the commits and log the hours I give.
+After the fleet lands it (ticket `in-review`, **draft** MR open; Plane and Ejad HR not moved yet):
+- **`review`:** Claude's final check of the MR diff (Part C). Findings go to `specs/tickets/NNN-<slug>/review.md`; if
+  there are any, add a `## Rework` section to `rd.md` that points to it, set the ticket back to `ready`, and the
+  router re-dispatches a worker with them.
+- **`deliver`** (only after a clean review): `node .claude/scripts/ejad-land.cjs deliver NNN <branch>` marks the MR
+  ready and moves Plane and Ejad HR to Review; then the hours.
+- With `review deliver` together: deliver right after a clean review, without asking.
 
 ## Final result (end of part A)
 

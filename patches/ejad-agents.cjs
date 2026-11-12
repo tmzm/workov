@@ -6,7 +6,7 @@ This repository lands on GitLab, not GitHub. In PR mode, skip the \`gh\` precond
 
 \`node .claude/scripts/ejad-land.cjs land NNN <branch>\`
 
-It pushes the branch (never force), uploads the ticket's \`delivery/screens\`, creates or updates the GitLab MR from \`delivery/mr-title.txt\` and \`delivery/mr.md\` (assignee and reviewer set), comments and moves the Plane item to Review, and moves the Ejad HR mirror task to REVIEW with the MR link. The \`prUrl\` is the URL on its \`MR_URL\` line. If it exits non-zero, report its message to the router, leave the ticket \`ready\`, and do nothing else. Never run \`gh\`.
+It pushes the branch (never force) and opens or updates the GitLab MR as a **draft** from the ticket's delivery pack (screenshots, \`delivery/mr-title.txt\`, \`delivery/mr.md\`). Plane and Ejad HR are not touched: the owner's final review marks the MR ready and moves them (\`ejad-land.cjs deliver\`). The \`prUrl\` is the URL on its \`MR_URL\` line.
 `;
 const WORKER_BLOCK=`
 # Ejad rules (override anything below that disagrees)
