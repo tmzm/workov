@@ -18,7 +18,7 @@ fs.renameSync(path.join(out, 'electron.exe'), path.join(out, 'Ejad Fleet.exe'));
 fs.rmSync(path.join(out, 'resources', 'default_app.asar'), { force: true });
 const app = path.join(out, 'resources', 'app');
 fs.mkdirSync(app, { recursive: true });
-for (const f of ['main.js', 'chat-engine.js', 'preload.js', 'shell-preload.js', 'setup.js', 'setup.html', 'setup-page.js', 'setup-preload.js', 'chat.html', 'chat.css', 'chat.js', 'chat-md.js', 'chat-boot.js', 'package.json', 'loading.html', 'icon.png']) fs.copyFileSync(f, path.join(app, f));
+for (const f of ['main.js', 'chat-engine.js', 'preload.js', 'shell-preload.js', 'setup.js', 'start.html', 'start-page.js', 'chat.html', 'chat.css', 'chat.js', 'chat-md.js', 'chat-boot.js', 'package.json', 'icon.png']) fs.copyFileSync(f, path.join(app, f));
 
 (async () => {
   try {

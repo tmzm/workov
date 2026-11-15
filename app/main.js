@@ -15,7 +15,9 @@ const { spawn, spawnSync } = require('node:child_process');
 
 const SELFTEST = process.argv.includes('--selftest');
 const START_HIDDEN = process.argv.includes('--hidden');
-const CFG_FILE = path.join(app.getPath('appData'), 'EjadFleet', 'config.json');
+// EJAD_TEST_DIR gives tests their own data, config and instance lock, so they never touch an installed copy
+if (process.env.EJAD_TEST_DIR) app.setPath('userData', path.join(process.env.EJAD_TEST_DIR, 'userData'));
+const CFG_FILE = path.join(process.env.EJAD_TEST_DIR || app.getPath('appData'), 'EjadFleet', 'config.json');
 const DEFAULTS = { fleet: 'E:\\Projects\\Ejad\\dashboard-fleet', autostart: true };
 
 let cfg = { ...DEFAULTS };
@@ -219,24 +221,21 @@ function setupChat() {
   ipcMain.handle('shell:chatHide', (e) => { if (fromDashboard(e)) hideChatView(); });
 }
 
-// ---------- first-run setup ----------
-let setupWin = null;
-function openSetup() {
-  if (setupWin) { setupWin.show(); setupWin.focus(); return; }
-  setupWin = new BrowserWindow({ width: 760, height: 780, minWidth: 460, minHeight: 520, backgroundColor: '#0f0e0b', title: 'Welcome to Ejad Fleet', autoHideMenuBar: true, icon: path.join(__dirname, 'icon.png'),
-    webPreferences: { preload: path.join(__dirname, 'setup-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
-  lockChat(setupWin.webContents);
-  setupWin.on('closed', () => { setupWin = null; });
-  setupWin.loadFile(path.join(__dirname, 'setup.html'));
-}
+// ---------- start screen: checks, onboarding and launch all happen in the main window ----------
+function openSetup() { if (!win) createWindow(); win.loadFile(path.join(__dirname, 'start.html'), { query: { force: '1' } }); open(); }
 function setupIpc() {
-  const ok = (e) => setupWin && e.sender === setupWin.webContents;
+  const ok = (e) => win && e.sender === win.webContents && e.senderFrame && /\/start\.html/.test(e.senderFrame.url);
   ipcMain.handle('setup:checks', (e) => (ok(e) ? setup.checks(cfg) : null));
   ipcMain.handle('setup:claudeLogin', (e) => (ok(e) ? setup.claudeLogin() : null));
-  ipcMain.handle('setup:pickFleet', async (e) => { if (!ok(e)) return; await chooseFleet(setupWin); });
+  ipcMain.handle('setup:pickFleet', async (e) => { if (!ok(e)) return; await chooseFleet(win); });
   ipcMain.handle('setup:open', (e, url) => { if (ok(e) && /^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
   ipcMain.handle('setup:testNotification', (e) => { if (ok(e)) toast('Notifications work', 'You will hear about finished tickets, provider problems and permission requests.'); });
-  ipcMain.handle('setup:done', (e) => { if (!ok(e)) return; cfg.onboarded = true; saveCfg(); setupWin.close(); lastStart = 0; open(); });
+  ipcMain.handle('setup:launch', async (e) => {
+    if (!ok(e)) return { ok: false };
+    lastStart = 0; startServices();
+    for (let n = 0; n < 60; n++) { if (await poll()) { if (win) win.loadURL(`http://127.0.0.1:${port()}/`); return { ok: true }; } if (n % 10 === 9) { lastStart = 0; startServices(); } await new Promise((r) => setTimeout(r, 1500)); }
+    return { ok: false };
+  });
 }
 
 // ---------- the window ----------
@@ -251,10 +250,8 @@ function createWindow() {
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(local) && !url.startsWith('file://')) { e.preventDefault(); if (/^https:\/\//.test(url)) shell.openExternal(url); } });
   win.on('close', (e) => { if (!quitting) { e.preventDefault(); win.hide(); } });
   win.on('closed', () => { win = null; chatViewShown = false; });
-  win.loadFile(path.join(__dirname, 'loading.html'));
+  win.loadFile(path.join(__dirname, 'start.html'));
   win.once('ready-to-show', () => { if (!START_HIDDEN) win.show(); });
-  const tryLoad = async () => { if (!win) return; if (await poll()) win.loadURL(local); else setTimeout(tryLoad, 3000); };
-  tryLoad();
 }
 
 if (!SELFTEST && !app.requestSingleInstanceLock()) app.quit();
@@ -275,8 +272,7 @@ app.whenReady().then(async () => {
   tray.on('click', open); tray.on('double-click', open);
   app.setAppUserModelId('net.ejad.fleet');
   setupChat(); setupIpc(); applyLoginItem(); updateTray(); createWindow();
-  const first = setup.checks(cfg);
-  if (!cfg.onboarded || !first.ready) { if (START_HIDDEN) toast('Ejad Fleet needs setup', first.claude.loggedIn ? 'A required tool is missing. Open Setup & checks.' : 'Sign in to Claude to use the chat and planner.', openSetup); else openSetup(); }
+  if (START_HIDDEN) { const first = setup.checks(cfg); if (!first.ready) toast('Ejad Fleet needs setup', first.claude.loggedIn ? 'A required tool is missing. Open Ejad Fleet to finish.' : 'Sign in to Claude to use the chat and planner.', open); }
   if (process.argv.includes('--chat')) openChat();
   setInterval(poll, 15000);
 });

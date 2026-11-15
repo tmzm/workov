@@ -1,7 +1,7 @@
 {
   "name": "ejad-fleet-app",
   "productName": "Ejad Fleet",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Windows launcher for the Ejad worker fleet: starts with Windows, keeps the dashboard, router and tunnel running, shows the dashboard in its own window.",
   "main": "main.js",
   "private": true,
@@ -34,17 +34,15 @@
       "preload.js",
       "shell-preload.js",
       "setup.js",
-      "setup.html",
-      "setup-page.js",
-      "setup-preload.js",
       "chat.js",
       "chat-md.js",
       "chat-boot.js",
       "chat.html",
       "chat.css",
-      "loading.html",
       "icon.png",
-      "package.json"
+      "package.json",
+      "start.html",
+      "start-page.js"
     ],
     "asarUnpack": [
       "node_modules/@anthropic-ai/claude-agent-sdk-win32-x64/**"
@@ -63,6 +61,7 @@
       "shortcutName": "Ejad Fleet",
       "uninstallDisplayName": "Ejad Fleet",
       "runAfterFinish": true
-    }
+    },
+    "afterPack": "after-pack.js"
   }
 }
