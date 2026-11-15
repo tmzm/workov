@@ -79,9 +79,10 @@ function ticket(nnn) {
   };
   const rd = read('rd.md');
   const plane = (/\*\*Plane:\*\*\s*([A-Z][A-Z0-9]*-\d+)/.exec(rd) || [])[1];
-  if (!plane) throw new Error(`rd.md of ${dir} has no "**Plane:** <IDENT>-<n>" line`);
+  // "**Plane:** none" is allowed for a side job with no Plane item (e.g. a CI fix): only Plane and Ejad HR are skipped.
+  if (!plane && !/\*\*Plane:\*\*\s*none\b/i.test(rd)) throw new Error(`rd.md of ${dir} has no "**Plane:** <IDENT>-<n>" or "**Plane:** none" line`);
   return {
-    root, packRoot, screenDir: path.join(packRoot, 'delivery'), plane,
+    root, packRoot, screenDir: path.join(packRoot, 'delivery'), plane, ticketDir: `${TICKETS}/${dir}`,
     hrTask: (/\*\*Ejad HR task:\*\*\s*([0-9a-f-]{36})/.exec(rd) || [])[1] || null,
     title: read('delivery/mr-title.txt').trim() || `feat: ${((/^#\s+(.+)$/m.exec(rd) || [])[1] || dir).trim()}`,
     body: read('delivery/mr.md') || read('results.md') || `Ticket ${dir}.`,
@@ -105,6 +106,7 @@ async function uploadScreens(gl, t, body) {
 }
 
 async function plane(t, mrUrl) {
+  if (!t.plane) return log('skip Plane: the ticket has no Plane item');
   const key = env('PLANE_API_KEY');
   if (!key) return log('skip Plane: PLANE_API_KEY not set');
   const H = { 'X-API-Key': key };
@@ -129,6 +131,7 @@ async function plane(t, mrUrl) {
 }
 
 async function ejadHr(t, mrUrl, title) {
+  if (!t.plane && !t.hrTask) return log('skip Ejad HR: the ticket has no Plane item or Ejad HR task');
   const email = env('HR_EMAIL');
   const pass = env('HR_PASS');
   if (!email || !pass) return log('skip Ejad HR: HR_EMAIL/HR_PASS not set');
@@ -167,15 +170,69 @@ function pack(dir, planeId) {
   };
 }
 
+// Fleet tickets (specs/tickets/) stay local, except each ticket's evidence/ folder, which the MR carries as proof of
+// the checks: the branch that reaches GitLab is the local branch replayed with every other specs/tickets change
+// undone (rd.md, eval.md, results, delivery packs). Commits left empty are dropped; every other commit keeps its
+// message, author and dates, so the replay is deterministic and a re-land after rework is a fast-forward.
+const TICKETS = 'specs/tickets';
+function shEnv(env, cmd, args, input) {
+  return execFileSync(cmd, args, { encoding: 'utf8', input, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ...env } }).trim();
+}
+function withoutTickets(branch, ticketDir) {
+  // Only this ticket's evidence/ folder is kept; another ticket's evidence that a branch carries along is undone too.
+  const isEvidence = (p) => Boolean(ticketDir) && p.startsWith(`${ticketDir}/evidence/`);
+  sh('git', ['fetch', '-q', 'origin', 'main']);
+  const base = sh('git', ['merge-base', branch, 'origin/main']);
+  let baseTickets = true;
+  try { sh('git', ['cat-file', '-e', `${base}:${TICKETS}`]); } catch { baseTickets = false; }
+  const commits = sh('git', ['rev-list', '--reverse', '--parents', `${base}..${branch}`]).split(String.fromCharCode(10)).filter(Boolean);
+  const idx = path.join(require('node:os').tmpdir(), `ejad-land-${process.pid}.idx`);
+  const I = { GIT_INDEX_FILE: idx };
+  let parent = base;
+  let parentTree = sh('git', ['rev-parse', `${base}^{tree}`]);
+  let changed = false; // a branch with nothing to strip is pushed as it is: replayed commits would get new hashes
+  try {
+    for (const line of commits) {
+      const [c, ...ps] = line.split(' ');
+      if (ps.length > 1) throw new Error(`merge commit ${c} on ${branch}: rebase the branch first`);
+      shEnv(I, 'git', ['read-tree', c]);
+      // Undo every non-evidence ticket path: drop it, then put back the base's version where the base has one.
+      const NL = String.fromCharCode(10), TAB = String.fromCharCode(9);
+      const own = shEnv(I, 'git', ['ls-files', '--', TICKETS]).split(NL).filter((p) => p && !isEvidence(p));
+      const kept = baseTickets
+        ? sh('git', ['ls-tree', '-r', base, '--', TICKETS]).split(NL).filter(Boolean)
+            .map((l) => l.split(TAB)).filter(([, p]) => !isEvidence(p)).map(([m, p]) => { const [mode, , sha] = m.split(' '); return `${mode} ${sha}${TAB}${p}`; })
+        : [];
+      const info = own.map((p) => `0 ${'0'.repeat(40)}${TAB}${p}`).concat(kept);
+      if (info.length) shEnv(I, 'git', ['update-index', '--index-info'], info.join(NL) + NL);
+      const tree = shEnv(I, 'git', ['write-tree']);
+      if (tree !== sh('git', ['rev-parse', `${c}^{tree}`])) changed = true;
+      if (tree === parentTree) { changed = true; continue; }
+      const [an, ae, ad, cn, ce, cd] = sh('git', ['log', '-1', '--format=%an%x00%ae%x00%aI%x00%cn%x00%ce%x00%cI', c]).split(String.fromCharCode(0));
+      const id = { GIT_AUTHOR_NAME: an, GIT_AUTHOR_EMAIL: ae, GIT_AUTHOR_DATE: ad, GIT_COMMITTER_NAME: cn, GIT_COMMITTER_EMAIL: ce, GIT_COMMITTER_DATE: cd };
+      parent = shEnv(id, 'git', ['commit-tree', tree, '-p', parent, '-F', '-'], sh('git', ['log', '-1', '--format=%B', c]) + String.fromCharCode(10));
+      parentTree = tree;
+    }
+  } finally {
+    try { fs.unlinkSync(idx); } catch {}
+  }
+  if (!changed) return sh('git', ['rev-parse', branch]);
+  if (parent === base) throw new Error(`${branch} has no changes besides local ticket files`);
+  return parent;
+}
+
 // Push and open or update the MR. draft=true (the fleet's merger): nothing is marked delivered yet;
 // Claude's review then runs `deliver`, which marks it ready and moves Plane and Ejad HR.
 async function openMr(t, branch, draft) {
   if (!t.title || !t.body) throw new Error('the delivery pack has no mr-title.txt or mr.md');
   const gl = gitlab();
-  await write(`git push origin ${branch}`, () => sh('git', ['push', 'origin', branch]));
+  const sha = withoutTickets(branch, t.ticketDir);
+  await write(`git push origin ${branch} (${sha.slice(0, 8)}, local ticket files removed, evidence kept)`, () => sh('git', ['push', 'origin', `${sha}:refs/heads/${branch}`]));
   const body = await uploadScreens(gl, t, t.body);
   const reviewer = REVIEWER();
-  const fields = { title: t.title, description: body, assignee_ids: [ME.gitlab], reviewer_ids: reviewer ? [reviewer] : [], remove_source_branch: false };
+  // This GitLab ignores the API's `draft` field: the "Draft: " title prefix is what makes an MR a draft.
+  const title = `${draft ? 'Draft: ' : ''}${t.title.replace(/^(draft:s*)+/i, '')}`;
+  const fields = { title, description: body, assignee_ids: [ME.gitlab], reviewer_ids: reviewer ? [reviewer] : [], remove_source_branch: false };
   let mr = await mrFor(gl, branch);
   if (mr && mr.state === 'opened') {
     await write(`update MR !${mr.iid}${draft ? ' (draft)' : ' (ready)'}`, async () => (mr = await req(`${gl.api}/merge_requests/${mr.iid}`, json('PUT', { 'PRIVATE-TOKEN': gl.token }, { ...fields, draft }))));
@@ -190,10 +247,22 @@ async function land(nnn, branch) {
   log(`MR_URL ${url}`);
 }
 
+// A delivered ticket is handed over (MR ready, Plane and Ejad HR in Review): the fleet has nothing left to track, so
+// its board row becomes done instead of staying in-progress or in-review until someone merges.
+function markDone(nnn) {
+  const file = 'specs/tickets/BOARD.md';
+  if (!nnn || !fs.existsSync(file)) return;
+  const text = fs.readFileSync(file, 'utf8');
+  const row = /^(\|\s*)(\d{3})(\s*\|[^|]*\|\s*)(in-progress|in-review|blocked|ready|draft)(\s*\|)/gm;
+  const next = text.replace(row, (m, a, n, b, status, c) => (n === nnn ? `${a}${n}${b}done${' '.repeat(Math.max(0, status.length - 4))}${c}` : m));
+  if (next !== text) write(`board ${nnn} -> done`, async () => fs.writeFileSync(file, next));
+}
+
 async function deliver(t, branch) {
   const url = await openMr(t, branch, false);
   await plane(t, url);
   await ejadHr(t, url, t.title);
+  if (t.ticketDir) markDone(path.basename(t.ticketDir).slice(0, 3));
   log(`MR_URL ${url}`);
 }
 

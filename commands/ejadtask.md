@@ -1,6 +1,6 @@
 ---
 description: Prepare a task of the current project for another AI to implement cheaply and well — sync Plane/Ejad HR, pick and claim a task, a short decision plan, mockup, draft MR and an implementation prompt; later review the result and deliver. Implements itself only when I ask.
-argument-hint: "[task id (e.g. ABC-42)] [headless | with opencode|copilot|kilo|antigravity | auto | manual | sync | plan only | no mockup | claude mockup | approve | review | deliver | implement | other changes]"
+argument-hint: "[task id (e.g. ABC-42)] [headless | run | with opencode|copilot|kilo|antigravity | auto | sync | plan only | no mockup | claude mockup | approve | review | deliver | implement | other changes]"
 ---
 
 # /ejadtask — Claude plans and reviews, another AI implements (Plane + GitLab + Ejad HR)
@@ -16,13 +16,30 @@ typing, guided by tests, lint and a short plan. Quality comes from:
 4. **phases:** a large task is split into phases small enough for a weak model;
 5. **one strong review at the end** (part C) of the implementer's diff, sent back to the implementer as a fix prompt.
 
-**Fleet or headless.** If the repo has worker-fleet installed (`specs/worker-fleet.config.json` exists) the default is
-**fleet mode** (see "Fleet mode" below): the plan becomes a worker-fleet ticket, and the fleet builds, tests, reviews
-and lands it with a live dashboard. With `headless` in my input, or when worker-fleet isn't installed, use the flow
-below as written: the handoff prompt, the delivery pack, `review` and `deliver`.
+**Everything is a fleet ticket.** Every piece of work this command does — planning a Plane task, building it, review
+rework, and any side job I ask for in the same run (fixing an MR's failing pipeline, a follow-up fix, a backend gap
+that this repo must cover) — is a worker-fleet ticket on the Fleet Control board, so I can watch it live. Never run
+a provider headless and never hand me a paste-in prompt unless my input says `headless`. See "Fleet mode" below.
+The two modes never mix:
+- **Fleet mode (default):** Claude plans (the ticket), a fleet worker on the provider implements, Claude reviews
+  (`review`) and delivers (`deliver`).
+- **`headless`:** the fleet is not used at all (no tickets, no board rows, no router, no dashboard, no fleet clone).
+  Claude plans in the plans folder, opens the draft MR and hands me the implementation prompt (the **Final
+  result**); I run the implementer myself, then call `review` and `deliver`. Claude runs the provider itself only
+  when my input also says `run` (see "Running the provider").
+- **Where the fleet lives:** the repo itself when `specs/worker-fleet.config.json` exists; otherwise its fleet clone,
+  the sibling folder `<repo>-fleet` (e.g. `E:\Projects\Ejad\dashboard-fleet`) when that has the config. Neither →
+  stop and ask me whether to install worker-fleet (`ejad-fleet/install.sh`).
+- **Start the dashboard first** (`bash .claude/scripts/start-dashboard.sh` in the fleet folder) and give me
+  `http://localhost:3080` before any planning, so the ticket is visible from the moment it is created.
+- **One router at a time.** If a router is already running, don't start a second one: add the ticket as `ready` and
+  let the running router pick it up (start it without restricting it to one ticket); if it was started for one
+  ticket only, start a fresh router for the new ticket when it exits.
+- **Pushing:** landing needs the fleet folder to push to GitLab. If `remote.origin.pushurl` is disabled there, ask
+  me once before enabling it.
 
 Modes (from my input):
-- **Default, part A (prepare):** steps 1–10. No feature code.
+- **Default, part A (prepare):** steps 1–10, as fleet tickets. No feature code.
 - **`review`, part C:** after the other AI finishes: review its diff against the plan and give a fix prompt.
 - **`deliver`, part D:** push, MR, Plane, Ejad HR, time.
 - **`implement`, part B:** Claude implements itself. Only when I ask.
@@ -58,8 +75,9 @@ From the repository you are running in:
 - **Project rules:** the repo's `CLAUDE.md`/`AGENTS.md`, `README.md`, `package.json` (or equivalent), the plans
   folder (default `docs/plans/`), lint config. They win over this command. Note the repo's own lint/test/build/e2e
   commands and any tool quirks.
-- **MR template:** `.gitlab/merge_request_templates/` if present; otherwise `## Summary` / `## Screenshots` /
-  `## Notes`.
+- **MR description:** always exactly these sections, in this order, and nothing else: `## Summary`,
+  `## Implementation`, `## Screenshots` (only when the change has screenshots), `## Notes`. This wins over any repo MR
+  template (see **MR description** under "Delivery pack").
 
 ## Fixed facts (all projects)
 
@@ -100,9 +118,9 @@ returns the question.
 | Agent | Mode | Model | Job |
 |---|---|---|---|
 | **Scout** | A1–2 | haiku | Reads Plane and Ejad HR, matches them, checks dependencies and whether a task is already built. Read-only. |
-| **Planner** | A5 | sonnet | Researches narrowly and writes the plan to the **Plan standard**. Writes only the plan file. |
+| **Planner** | A5 | sonnet | Researches narrowly and writes the plan to the **Plan standard**. Writes only the plan file. In fleet mode it is the fleet agent `ejad-planner`, run by `ejad-plan.cjs` (see "Fleet mode"). |
 | **Plan checker** | A5 | sonnet, fresh | One pass: what would a weaker implementer have to guess, and what is wrong against the code or the API. Blockers only. |
-| **Designer** | A7 | sonnet | Mockup and screenshots, only for a new screen or a real layout change. |
+| **Designer** | A7 | sonnet | Studied mockup (design system, real screens, UI/UX rules, self-checked screenshots) for a new screen or a real layout change. In fleet mode: `ejad-designer`, run by `ejad-mockup.cjs`. |
 | **Reviewer** | C | sonnet (opus only if I ask) | Reviews the implementer's diff against the plan with the appendix procedures. |
 | **Publisher / Timekeeper** | A8, D | haiku | Git push, MR, Plane, Ejad HR writes, hours — after the gates below. |
 
@@ -144,6 +162,8 @@ the lint already enforces. Quote a repo rule only when lint can't catch it.
 12. Delivery pack: commit style, what the implementer must NOT do (push, Plane, Ejad HR — those are mine unless I
     say), and the **delivery pack** it must leave ready (see "Delivery pack" below), with the named list of screenshots
     to take (screen, state, language, theme, desktop or 390 px phone) and how to reach each state on the real app.
+    **Any change a user can see gets screenshots, however small** (one button, a colour, a text): at least the
+    changed element in each state it has (e.g. normal and busy), in the context of its screen.
 13. Definition of done: one checkbox per acceptance criterion, plus all checks green and the reviews run.
 14. Out of scope, then Deviations (empty; the implementer appends).
 15. Appendix: the **Review procedures** block below, verbatim.
@@ -176,10 +196,18 @@ the lint already enforces. Quote a repo rule only when lint can't catch it.
 root, kept out of git by adding `.delivery/` to `.git/info/exclude` (local only, never committed):
 - `screens/NN-<name>.png`: every screenshot in the plan's list, taken against the real running app (the repo's dev
   server and environment), checked by eye: no errors, no sideways scroll at 390 px, texts in the right language.
-- `mr.md`: the MR description in the repo's MR template (or `## Summary` / `## Screenshots` / `## Notes`): summary
-  bullets per feature or fix; screenshots as `![<caption>](screens/NN-<name>.png)` with a bold caption line above
-  each; Notes with the deviations, backend gaps, overlaps with other MRs and the checks run with their results. Short,
-  no file-by-file detail, no AI attribution.
+  Required for **every** change a user can see, even a single button; only a change with nothing visible (API,
+  tests, tooling) has none.
+- `mr.md`: the MR description, in the **MR description** format below.
+- **MR description** (every MR this command opens or updates, fleet or headless, overrides any repo template):
+  exactly these sections, in this order, nothing before or after them:
+  - `## Summary`: what changed for the user, one bullet per feature or fix.
+  - `## Implementation`: how it was built, short: the main pieces (services, components, routes, API calls) and the
+    decisions; no file-by-file list.
+  - `## Screenshots`: only when there are screenshots; each as a bold caption line, then
+    `![<caption>](screens/NN-<name>.png)`. Every screenshot taken is in it, uploaded to GitLab at delivery.
+  - `## Notes`: deviations, backend gaps, overlaps with other MRs, follow-ups, and the checks run with their results.
+  Short, no AI attribution.
 - `mr-title.txt`: one line, conventional style, matching the main commit.
 - `tracker.md`: the comment for Plane and Ejad HR (3–6 lines: what was done, checks, follow-ups), without the MR link
   (added at delivery).
@@ -214,10 +242,10 @@ session, or with a fresh Planner given a short list. No second round unless a fi
    assigned to me; comment the MR link on the Plane item and the Ejad HR task.
 9. **Approval gate.** Show me the mockup (if any) and the plan's decisions and gaps; apply my changes; record
    "approved by <my name> on <date>" in the plan.
-10. **Handoff and run.** Write the implementation prompt (`handoff-<task>.md` in the scratchpad). Then, unless my
-    input says `manual` (I paste the prompt myself), **run the provider yourself** as described in "Running the
-    provider" below, and continue straight into `review` and `deliver` when it finishes. With `manual`, end with the
-    **Final result** instead.
+10. **Handoff** (`headless` only; in fleet mode the router runs the ticket). Write the implementation prompt
+    (`handoff-<task>.md` in the scratchpad) and end with the **Final result**, which carries it. Only with `run` in my
+    input: **run the provider yourself** as described in "Running the provider" below, and continue straight into
+    `review` and `deliver` when it finishes.
     The prompt tells the implementer to:
     - read the repo's rules file and the plan; follow the phases and steps in order: tests first, copy the named model
       file, run each step's check;
@@ -232,7 +260,7 @@ session, or with a fresh Planner given a short list. No second round unless a fi
     Paste the **Delivery pack** spec from this command into the prompt so the implementer doesn't depend on the plan
     alone.
 
-## Running the provider (headless, default after the approval gate)
+## Running the provider (only with `headless run` in my input)
 
 Claude plans, checks and delivers; the provider only implements. You start it, answer its permission requests, and
 loop it on the review's findings, without me copying anything.
@@ -270,8 +298,9 @@ loop it on the review's findings, without me copying anything.
    tests and the build (report exit codes only).
 2. The **Reviewer** (fresh Sonnet) reviews the diff against the plan, the acceptance criteria and the mockup, with
    the appendix procedures. It returns at most 15 confirmed findings, each with file:line, the scenario and the fix.
-   Also check the delivery pack: every listed screenshot exists and you look at each one (Read the PNG); `mr.md`
-   matches the template and the real changes; nothing claims a check that didn't run.
+   Also check the delivery pack: every listed screenshot exists and you look at each one (Read the PNG); a change a
+   user can see without screenshots is a finding, however small; `mr.md` has exactly Summary / Implementation /
+   Screenshots (when there are any) / Notes and matches the real changes; nothing claims a check that didn't run.
 3. Give me a **fix prompt** for the implementer (findings as a numbered list plus "re-run all checks"). Fix things
    yourself only when they are tiny or I ask. Repeat `review` once after the fixes if there were serious findings.
 
@@ -297,44 +326,75 @@ first; show me only a failure). Without either file, one script in the scratchpa
 
 Only when I ask: a Sonnet implementer (Opus only if I ask) follows the plan, then part C and part D.
 
-## Fleet mode (default when worker-fleet is installed)
+## Fleet mode (always, unless my input says `headless`)
 
 The fleet's router dispatches workers (OpenCode models from `specs/worker-fleet.config.json`), each in its own
 worktree; a tester runs `eval.md`, a reviewer checks the diff, and the merger lands it with
-`node .claude/scripts/ejad-land.cjs land NNN <branch>` (GitLab MR, Plane → Review, Ejad HR → REVIEW, no tokens).
-Claude only writes the ticket and, optionally, reviews the result.
+`node .claude/scripts/ejad-land.cjs land NNN <branch>`: push and a **draft** GitLab MR only (Plane and Ejad HR
+don't move). Claude plans (writes the ticket), then reviews (`review`) and delivers (`deliver`): marks the MR ready
+and moves Plane and Ejad HR to Review. The fleet's own tester and reviewer don't replace Claude's review.
 
 Part A changes:
 - **Steps 1–3** as written (sync, pick, claim).
 - **Step 4 (branch):** none. The fleet creates the worker branch from the checkout's `main`; check that the checkout
   is on `main` and clean, and pull it.
-- **Step 5 (plan) → the ticket.** The Planner writes `specs/tickets/NNN-<slug>/rd.md` and `eval.md` in the format of
-  the repo's existing tickets (read one, and `.claude/skills/write-tickets/SKILL.md` for the templates), with the next
-  free `NNN`. `rd.md` holds the Plan standard's content (goal and acceptance criteria, what exists, API contract and
-  gaps, decisions, states, texts, Files table, phases and steps with the file to copy) plus these lines and sections:
-  `**Status:** draft`, `**Plane:** <IDENT>-<n>`, `**Ejad HR task:** <uuid>`, `## Screenshots` (the named list),
-  `## Final review` (the Review procedures block), and `## Landing` with `- Mode: pr`. `eval.md` turns the acceptance
-  criteria and the Verify section into numbered pass/fail checks `E-1…` (command or browser steps, expected result).
-  Add the row to `specs/tickets/BOARD.md` with status `draft` and the `Runs` dependencies. Then the one plan check.
-- **Step 7 (mockup):** for a new screen or a real layout change, the **worker** builds it (cheaper): add a
-  `## Mockup` section to `rd.md` with what it must show (states, languages, themes, phone width, only what the API
-  can do). The worker builds `mockup.html` first and waits; I see it in the dashboard's Mockup tab and answer
-  *approve* or my changes. With `claude mockup` in my input, the Designer builds it instead and saves it as the
-  ticket's `mockup.html` before the ticket goes to `ready`.
+- **Planning runs on the fleet.** The plan is written by the fleet's Claude ticket writer (agent `ejad-planner`,
+  Sonnet), not in this session, so I watch it on the board and in the ticket's Logs tab like any worker:
+  1. **Reserve:** pick the next free `NNN`, create `specs/tickets/NNN-<slug>/rd.md` with only the title line,
+     `**Status:** specifying` and `**Mode:** solo`, and add the board row as `specifying`.
+  2. **Brief:** write `job/briefs/NNN.md` (local, `job/` is ignored): the Plane task (id, title, description and
+     acceptance criteria verbatim), the Ejad HR task id, decisions I already made, the backend location and branch,
+     overlapping MRs, and what you found while claiming (files to reuse, endpoints). Facts only, no plan.
+  3. **Run it** in the background from the fleet folder:
+     `node .claude/scripts/ejad-plan.cjs NNN-<slug> job/briefs/NNN.md`. It streams every step into
+     `job/logs/NNN-planner.log` (the Logs tab) and keeps the writer heartbeat (the board shows it as the ticket's
+     agent). Don't plan in this session meanwhile; you're notified when it exits (it prints `PLANNER_SESSION <id>`).
+  4. **Questions:** if the heartbeat ends `waiting-user`, the ticket's `## Open questions` holds them: ask me (one
+     question each, with the planner's recommendation first), write my answers to `job/briefs/NNN-answers.md`, and
+     resume: `node .claude/scripts/ejad-plan.cjs NNN-<slug> --resume <id> --answer job/briefs/NNN-answers.md`.
+  5. **Plan check:** when the row is `draft`, one fresh Sonnet plan checker (as in "Plan check") reads the ticket;
+     append its blockers under `## Plan check` in `rd.md` and resume the planner with them as the answer file. No
+     second round unless a fix changed a decision.
+  `ejad-planner` reads the **Plan standard** and **Fleet mode** sections of this file, so keep them the source of
+  truth for what a ticket must hold.
+- **Side jobs are tickets.** Anything else I ask for in the run (e.g. "fix the lint of MR !45") gets its own ticket
+  the same way, with `**Plane:** none` when it has no Plane item and `## Landing` `- Mode: pr`.
+- **What the ticket holds** (the planner's job): `rd.md` holds the Plan standard's content (goal and acceptance
+  criteria, what exists, API contract and gaps, decisions, states, texts, Files table, phases and steps with the file
+  to copy) plus `**Status:** draft`, `**Plane:** <IDENT>-<n>`, `**Ejad HR task:** <uuid>`, `## Screenshots` (the
+  named list), `## Final review` (the Review procedures block), and `## Landing` with `- Mode: pr`. `eval.md` turns
+  the acceptance criteria and the Verify section into numbered pass/fail checks `E-1…`. The board row ends `draft`
+  with the `Runs` dependencies.
+- **Step 7 (mockup):** for a new screen or a real layout change, the **Designer** (Claude, agent `ejad-designer`, run by
+  `.claude/scripts/ejad-mockup.cjs`) builds a studied mockup **before the ticket goes to `ready`**. Add a `## Mockup` section to
+  `rd.md` (what it must show: states, languages, themes, phone width, only what the API can do), then run in the background
+  from the fleet folder: `node .claude/scripts/ejad-mockup.cjs NNN-<slug> job/briefs/NNN.md`. It streams into
+  `job/logs/NNN-designer.log` (the Logs tab). The Designer studies the ticket, `DESIGN.md`, the real screens and the
+  ui-ux-pro-max rules, builds `mockup.html` with the app's own tokens (no emoji, both themes, EN/AR, 390 px), checks its own
+  screenshots, and writes `mockup-notes.md` (tokens, decisions, rules applied, and 6 to 10 points the implementer must
+  match). Its open design questions go to me, one at a time. I approve it in the dashboard's Mockup tab. The model comes from the
+  dashboard's Designer picker (default: Claude on my plan). The worker never designs: it builds the approved mockup as the
+  visual spec and logs any deviation in `results.md`. Use `--suffix v2` to propose a redesign without touching the approved one.
 - **Implementer:** with `with copilot|kilo|antigravity` in my input, add `## Implementer` with that name to `rd.md`;
   the worker delegates the build steps to that CLI (command lines in `.claude/scripts/implementers.json`). Default:
   the worker's own OpenCode Go model.
-- **Step 8:** commit the ticket folder and the board row on the local `main` (`docs(tickets): add ticket NNN for
-  <IDENT>-<n>`), never push it on its own; it reaches GitLab with the ticket's MR.
+- **Step 8:** commit the ticket folder on the local `main` (`docs(tickets): add ticket NNN for <IDENT>-<n>`); the
+  board row stays local (`BOARD.md` may be gitignored). Tickets are local only, except their evidence: never push them on
+  their own; `ejad-land.cjs` removes every `specs/tickets/` change from the branch it pushes except each ticket's
+  `evidence/` folder, so the MR carries the evidence but no rd, eval, results or delivery files. The merger's draft MR is the task's MR (no separate plan MR).
 - **Steps 9–10 → approval and start.** Tell me the ticket is `draft` on the board. I approve it on the Fleet Control
-  dashboard (or say "approve", and you set it `ready`). If the router isn't running, give me the command:
-  `opencode --agent router` in the repo (or `claude --agent router --name router --permission-mode auto`), and the
-  dashboard URL `http://localhost:3080`.
+  dashboard (or say "approve", and you set it `ready`). Once a ticket is `ready`, make sure the router loop runs:
+  `bash .claude/scripts/ejad-router-loop.sh` in the fleet folder, started in the background (one per repo: it says so
+  if one already runs; output in `job/router-loop.log`). Never use a one-shot `opencode run --agent router` — it
+  stops after one cycle and its workers stall. Give me the dashboard URL `http://localhost:3080`.
+- **Watching:** while tickets run, watch `specs/tickets/BOARD.md` (Monitor) and tell me when a ticket changes status;
+  when one reaches `in-review`, give me its draft MR link and run `review` if my input said `review`.
 
 After the fleet lands it (ticket `in-review`, **draft** MR open; Plane and Ejad HR not moved yet):
 - **`review`:** Claude's final check of the MR diff (Part C). Findings go to `specs/tickets/NNN-<slug>/review.md`; if
   there are any, add a `## Rework` section to `rd.md` that points to it, set the ticket back to `ready`, and the
-  router re-dispatches a worker with them.
+  router re-dispatches a worker with them. Never fix the findings outside the fleet, and never send a fix prompt
+  to a headless provider.
 - **`deliver`** (only after a clean review): `node .claude/scripts/ejad-land.cjs deliver NNN <branch>` marks the MR
   ready and moves Plane and Ejad HR to Review; then the hours.
 - With `review deliver` together: deliver right after a clean review, without asking.

@@ -58,7 +58,11 @@ fi
 
 # 4. the Ejad layer: overlay files, then patches (after setup, which regenerates agent files)
 cp -R "$HERE/overlay/." "$TARGET/"
-for p in ejad-agents ejad-worker ejad-dashboard ejad-delegate ejad-windows; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
+for p in ejad-agents ejad-worker ejad-dashboard ejad-agent-logs ejad-agent-roster ejad-decision-help ejad-delegate ejad-windows ejad-designer ejad-land-branch; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
+
+# A running OpenCode background server keeps the agent list it loaded at start: without a reload, new agents such
+# as `worker` fail with "Agent not found" when the router dispatches them.
+if command -v opencode >/dev/null; then ( cd "$TARGET" && opencode reload >/dev/null 2>&1 ) || true; fi
 
 # setup regenerates agent files: restore any tracked file again, so the team's files always win
 CHANGED="$(git -C "$TARGET" diff --name-only)"
@@ -73,6 +77,7 @@ grep -q "# ejad-fleet" "$EXCLUDE" 2>/dev/null || cat "$HERE/exclude.txt" >> "$EX
 if [ "$DO_COMMAND" = 1 ]; then
   mkdir -p "$HOME/.claude/commands"
   cp "$HERE/commands/ejadtask.md" "$HOME/.claude/commands/ejadtask.md"
+  cp "$HERE/commands/task.md" "$HOME/.claude/commands/task.md"; mkdir -p "$HOME/.claude/task-profiles"
   [ -f "$HOME/.claude/ejadtask.json" ] || { cp "$HERE/profile.example.json" "$HOME/.claude/ejadtask.json"; NEED_PROFILE=1; }
   # The approvals plugin, for /ejadtask's headless runs in any repo. Inactive unless EJAD_APPROVALS is set (or the
   # repo has worker-fleet), so ordinary OpenCode sessions are untouched.
