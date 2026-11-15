@@ -1,7 +1,7 @@
 {
   "name": "ejad-fleet-app",
   "productName": "Ejad Fleet",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Windows launcher for the Ejad worker fleet: starts with Windows, keeps the dashboard, router and tunnel running, shows the dashboard in its own window.",
   "main": "main.js",
   "private": true,

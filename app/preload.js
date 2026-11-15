@@ -2,7 +2,7 @@
 'use strict';
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-const calls = ['say', 'answer', 'interrupt', 'setModel', 'setPermissionMode', 'pickFolder', 'pickFiles', 'newChat', 'sessions', 'resume', 'state', 'openDashboard', 'claude', 'claudeLogin', 'folders', 'setFolder'];
+const calls = ['say', 'answer', 'interrupt', 'setModel', 'setPermissionMode', 'pickFolder', 'pickFiles', 'newChat', 'sessions', 'resume', 'state', 'openDashboard', 'claude', 'claudeLogin', 'folders', 'setFolder', 'context', 'usage', 'rewind', 'thinking', 'mcpToggle', 'files', 'openPath'];
 const api = {};
 for (const c of calls) api[c] = (a) => ipcRenderer.invoke('chat:' + c, a);
 api.pathOf = (file) => webUtils.getPathForFile(file);

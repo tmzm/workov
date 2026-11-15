@@ -10,7 +10,11 @@ function svg(name, cls) { const s = document.createElementNS('http://www.w3.org/
 function h(tag, cls, text, parent) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; if (parent) parent.append(n); return n; }
 const base = (p) => String(p || '').split(/[\\/]/).pop();
 const json = (o) => { try { return JSON.stringify(o, null, 2); } catch { return String(o); } };
-function bottom() { if (stick) scroller.scrollTop = scroller.scrollHeight; }
+const typing = h('div', 'typing'); const dots = h('span', 'dots', null, typing); for (let i = 0; i < 3; i++) h('i', null, null, dots);
+const typingText = h('span', null, 'Working', typing), typingTime = h('span', null, '', typing); let typingTimer = 0, typingSince = 0;
+function placeTyping() { if (typing.parentNode !== log || log.lastChild !== typing) log.append(typing); }
+function working(text) { typingText.textContent = text; }
+function bottom() { if (busy) placeTyping(); if (stick) scroller.scrollTop = scroller.scrollHeight; }
 scroller.addEventListener('scroll', () => { stick = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80; $('jump').classList.toggle('show', !stick); });
 $('jump').onclick = () => { stick = true; bottom(); };
 function clearEmpty() { const e = log.querySelector('.empty'); if (e) e.remove(); }
@@ -19,13 +23,17 @@ function empty() {
   const s = h('div', 'sug', null, e);
   for (const t of ['What changed in this repo today?', 'Explain how the router decides what to dispatch', 'Review my uncommitted changes']) { const b = h('button', null, t, s); b.onclick = () => { box.value = t; box.focus(); }; }
 }
+box.addEventListener('input', () => { if (busy) $('goIcon').firstChild.setAttribute('href', box.value.trim() ? '#i-send' : '#i-stop'); });
 function setBusy(b) {
-  busy = b; $('work').classList.toggle('show', b); $('goIcon').firstChild.setAttribute('href', b ? '#i-stop' : '#i-send'); $('go').setAttribute('aria-label', b ? 'Stop' : 'Send');
+  busy = b; $('work').classList.toggle('show', b); typing.classList.toggle('show', b); clearInterval(typingTimer);
+  if (b) { typingSince = Date.now(); working('Working'); typingTime.textContent = ''; placeTyping(); typingTimer = setInterval(() => { const s = Math.round((Date.now() - typingSince) / 1000); typingTime.textContent = s >= 5 ? s + 's' : ''; }, 1000); bottom(); } else typing.remove(); $('goIcon').firstChild.setAttribute('href', b ? '#i-stop' : '#i-send'); $('go').setAttribute('aria-label', b ? 'Stop' : 'Send');
 }
 
 // ---------- the timeline ----------
-function userBlock(text, attached) {
+function userBlock(text, attached, uuid) {
   clearEmpty(); const u = h('div', 'user', null, log); const who = h('div', 'who', null, u); h('span', 'avatar', 'T', who); who.append('You');
+  const acts = h('div', 'acts2', null, who); const cp = h('button', 'mini', 'Copy', acts); cp.type = 'button'; cp.onclick = () => navigator.clipboard.writeText(text || '');
+  if (uuid) { const rw = h('button', 'mini', 'Rewind files', acts); rw.type = 'button'; rw.title = 'Restore the files to how they were before this message'; rw.onclick = () => rewind(uuid, rw); }
   if (text) h('div', null, text, u).style.whiteSpace = 'pre-wrap';
   if (attached && attached.length) { const f = h('div', 'files', null, u); for (const p of attached) { const c = h('span', 'file', null, f); c.append(svg('file'), base(p)); } }
   turn = null; bottom();
@@ -35,7 +43,8 @@ function turnBody() {
   const a = h('div', 'asst', null, log), b = h('span', 'badge', null, a); b.append(svg('spark'));
   turn = h('div', 'body', null, a); return turn;
 }
-function textBlock(text) { const d = h('div', 'md', null, turnBody()); window.renderMarkdown(text, d); return d; }
+function copyable(d, getText) { const w = d.parentNode; if (d.parentNode.classList.contains('md-wrap')) return; const wrap = document.createElement('div'); wrap.className = 'md-wrap'; w.replaceChild(wrap, d); wrap.append(d); const b = h('button', 'mini', 'Copy', wrap); b.type = 'button'; b.onclick = () => { navigator.clipboard.writeText(getText()); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1200); }; }
+function textBlock(text) { const d = h('div', 'md', null, turnBody()); window.renderMarkdown(text, d); copyable(d, () => text); return d; }
 function thinkBlock(text) {
   const t = turnBody(), b = h('button', 'think', null, t); b.type = 'button'; b.setAttribute('aria-expanded', 'false'); b.append(svg('chev'), 'Thinking');
   const body = h('div', 'think-body', text || '', t); b.onclick = () => b.setAttribute('aria-expanded', b.getAttribute('aria-expanded') !== 'true');
@@ -75,7 +84,8 @@ function toolRow(id, name, input) {
   const host = turnBody(), row = h('details', 'tool', null, host), sm = h('summary', null, null, row);
   const ic = h('span', 'ico', null, sm); ic.append(svg(ICON[name] || 'spark'));
   const [verb, target] = summary(name, input).split('|');
-  h('span', 'verb', verb, sm); h('span', 'target', target, sm);
+  h('span', 'verb', verb, sm); const tg = h('span', 'target', target, sm);
+  if (['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(name)) { tg.classList.add('link'); tg.title = 'Show in folder'; tg.onclick = (e) => { e.preventDefault(); e.stopPropagation(); fleetChat.openPath(tg.textContent); }; }
   const st = h('span', 'state', null, sm); h('span', 'spin', null, st); sm.append(svg('chev', 'chev'));
   h('div', 'detail', null, row); fillDetail(row, name, input);
   tools[id] = { row, name, input, st, sm }; bottom(); return tools[id];
@@ -126,13 +136,14 @@ function onMessage(m, fromHistory) {
   } else if (m.type === 'result') {
     setBusy(false); turn = null; live = {};
     if (m.is_error) h('div', 'msg-err', (m.errors && m.errors.join('\n')) || m.result || 'The turn failed.', log);
-    loadSessions();
+    loadSessions(); paintContext();
   }
 }
 function onStream(ev) {
   if (ev.type === 'message_start') { live = {}; streamed.add(ev.message.id); }
   else if (ev.type === 'content_block_start') {
     const cb = ev.content_block;
+    working(cb.type === 'thinking' ? 'Thinking' : cb.type === 'tool_use' ? 'Running ' + cb.name.replace(/^mcp__/, '').replace(/__/g, ' › ') : 'Writing');
     if (cb.type === 'text') live[ev.index] = { type: 'text', text: '', el: h('div', 'md', null, turnBody()) };
     else if (cb.type === 'thinking') live[ev.index] = { type: 'thinking', t: thinkBlock('') };
     else if (cb.type === 'tool_use') { toolRow(cb.id, cb.name, {}); live[ev.index] = { type: 'tool', id: cb.id, json: '' }; }
@@ -143,11 +154,19 @@ function onStream(ev) {
     else if (d.type === 'input_json_delta') l.json += d.partial_json;
   } else if (ev.type === 'content_block_stop') {
     const l = live[ev.index]; if (!l) return;
-    if (l.type === 'text') window.renderMarkdown(l.text, l.el);
+    if (l.type === 'text') { window.renderMarkdown(l.text, l.el); copyable(l.el, () => l.text); }
     else if (l.type === 'thinking') l.t.btn.lastChild.textContent = 'Thought for ' + Math.max(1, Math.round((Date.now() - l.t.started) / 1000)) + ' seconds';
     else if (l.type === 'tool') { try { toolInput(l.id, JSON.parse(l.json || '{}')); } catch { /* the final message carries the input */ } if (tools[l.id] && tools[l.id].name === 'TodoWrite') { try { todoUpdate(l.id, JSON.parse(l.json)); } catch { /* same */ } } }
     bottom();
   }
+}
+
+async function rewind(uuid, btn) {
+  const d = await fleetChat.rewind({ uuid, dry: true });
+  if (!d || !d.canRewind) { h('div', 'note', 'Cannot rewind: ' + ((d && d.error) || 'no checkpoint for that message'), log); return; }
+  const n = d.filesChanged ? d.filesChanged.length : 0;
+  if (!confirm('Restore ' + n + ' file(s) to how they were before this message? Your chat stays as it is.')) return;
+  const r = await fleetChat.rewind({ uuid, dry: false }); btn.textContent = r && r.canRewind ? 'Rewound' : 'Failed'; h('div', 'note', r && r.canRewind ? 'Files restored to before that message.' : 'Rewind failed: ' + ((r && r.error) || ''), log); bottom();
 }
 
 // ---------- permissions ----------
@@ -160,6 +179,7 @@ function permission(d) {
   const acts = h('div', 'acts');
   if (d.toolName === 'AskUserQuestion') { questions(c, d, respond); return; }
   if (d.toolName === 'ExitPlanMode') { const p = h('div', 'md', null, c); p.style.padding = '8px 14px'; window.renderMarkdown(String((d.input && d.input.plan) || ''), p); }
+  else if (['Edit', 'MultiEdit', 'Write'].includes(d.toolName)) { const df = h('div', 'detail diff', null, c); h('div', 'diffhead', (d.input && d.input.file_path) || '', df); if (d.toolName === 'Write') diffLines('', String(d.input.content || '').split('\n').slice(0, 80).join('\n'), df); else for (const e of d.toolName === 'Edit' ? [d.input] : d.input.edits || []) diffLines(e.old_string, e.new_string, df); }
   else { h('pre', null, d.blockedPath ? d.blockedPath + '\n' + (d.input.command || json(d.input)) : (d.input.command || d.input.file_path || json(d.input)), c); }
   c.append(acts);
   const mk = (label, cls, fn, kbd) => { const b = h('button', 'btn ' + cls, null, acts); b.type = 'button'; b.append(label); if (kbd) h('kbd', null, kbd, b); b.onclick = fn; return b; };
@@ -185,21 +205,27 @@ function chips() {
   $('chips').replaceChildren(...files.map((f, i) => { const c = h('span', 'chip'); c.append(svg('file'), base(f)); c.firstChild.style.width = '13px'; const x = h('button', null, null, c); x.type = 'button'; x.setAttribute('aria-label', 'Remove ' + base(f)); x.append(svg('x')); x.firstChild.style.width = '12px'; x.onclick = () => { files.splice(i, 1); chips(); }; return c; }));
   $('chips').style.display = files.length ? 'flex' : 'none';
 }
+const hist = []; let histAt = -1;
 async function send() {
-  if (busy) { fleetChat.interrupt(); return; }
-  const text = box.value.trim(); if (!text && !files.length) return;
+  const text = box.value.trim();
+  if (busy && !text && !files.length) { fleetChat.interrupt(); return; }
+  if (!text && !files.length) return;
+  if (text && hist[0] !== text) hist.unshift(text); histAt = -1;
   closeMenu(); box.value = ''; grow(); const f = files; files = []; chips();
   if (text === '/clear') { await newChat(); return; }
-  if (text === '/model') { $('model').focus(); return; }
-  userBlock(text, f); stick = true; setBusy(true); await fleetChat.say({ text, files: f });
+  if (text === '/model') { openModels(); return; }
+  if (text === '/mode') { openModes(); return; }
+  if (text === '/usage' || text === '/context') { $('ctxChip').click(); return; }
+  const wasBusy = busy; stick = true; setBusy(true);
+  const uuid = await fleetChat.say({ text, files: f }); userBlock(text, f, uuid); if (wasBusy) bottom();
 }
 async function newChat() { await fleetChat.newChat(); streamed = new Set(); tools = {}; live = {}; todoCard = null; turn = null; setBusy(false); empty(); loadSessions(); }
 function grow() { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight, 200) + 'px'; }
 function closeMenu() { $('menu').classList.remove('show'); }
 function menuItems() { return [...$('menu').querySelectorAll('.it')]; }
-function pick(it) { box.value = '/' + it.dataset.name + ' '; closeMenu(); box.focus(); grow(); }
+function pick(it) { if (it.dataset.file) return pickFile(it); box.value = '/' + it.dataset.name + ' '; closeMenu(); box.focus(); grow(); }
 function openMenu(q) {
-  const all = [{ name: 'clear', description: 'Start a fresh chat', kind: 'Commands' }, { name: 'model', description: 'Pick the model', kind: 'Commands' }, ...cmds.map((c) => ({ ...c, kind: c.name.includes(':') || c.description.length ? 'Skills' : 'Commands' }))];
+  const all = [{ name: 'clear', description: 'Start a fresh chat', kind: 'Commands' }, { name: 'model', description: 'Pick the model', kind: 'Commands' }, { name: 'mode', description: 'Manual, Auto-edit, Auto, Plan or Allow all', kind: 'Commands' }, { name: 'usage', description: 'Context, cost and plan limits', kind: 'Commands' }, ...cmds.map((c) => ({ ...c, kind: c.name.includes(':') || c.description.length ? 'Skills' : 'Commands' }))];
   const list = all.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 40), m = $('menu'); m.replaceChildren();
   if (!list.length) { closeMenu(); return; }
   let last = ''; menuIdx = 0;
@@ -210,12 +236,25 @@ function openMenu(q) {
   }
   m.classList.add('show');
 }
-box.addEventListener('input', () => { grow(); const m = /^\/(\S*)$/.exec(box.value); if (m) openMenu(m[1]); else closeMenu(); });
+let mentionReq = 0;
+async function openMentions(q) {
+  const req = ++mentionReq, list = (await fleetChat.files(q)) || []; if (req !== mentionReq) return;
+  const m = $('menu'); m.replaceChildren(); if (!list.length) { closeMenu(); return; } menuIdx = 0; h('div', 'sec', 'Files', m);
+  for (const f of list) { const it = h('div', 'it' + (m.querySelector('.it') ? '' : ' on'), null, m); it.dataset.file = f; it.setAttribute('role', 'option'); h('b', null, f.split('/').pop(), it); h('span', null, f, it); it.onmousedown = (e) => { e.preventDefault(); pickFile(it); }; }
+  m.classList.add('show');
+}
+function pickFile(it) { const pos = box.selectionStart, before = box.value.slice(0, pos).replace(/@(\S*)$/, '@' + it.dataset.file + ' '); box.value = before + box.value.slice(pos); closeMenu(); box.focus(); box.selectionStart = box.selectionEnd = before.length; grow(); }
+box.addEventListener('input', () => {
+  grow(); const m = /^\/(\S*)$/.exec(box.value); if (m) { openMenu(m[1]); return; }
+  const at = /@(\S*)$/.exec(box.value.slice(0, box.selectionStart)); if (at) openMentions(at[1]); else closeMenu();
+});
 box.addEventListener('keydown', (e) => {
   const open = $('menu').classList.contains('show'), items = menuItems();
   if (open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); items[menuIdx].classList.remove('on'); menuIdx = (menuIdx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; items[menuIdx].classList.add('on'); items[menuIdx].scrollIntoView({ block: 'nearest' }); return; }
   if (open && (e.key === 'Tab' || e.key === 'Enter')) { e.preventDefault(); pick(items[menuIdx]); return; }
   if (e.key === 'Escape') { if (open) closeMenu(); else if (busy) fleetChat.interrupt(); return; }
+  if (e.key === 'ArrowUp' && !box.value.includes('\n') && box.selectionStart === 0 && histAt + 1 < hist.length) { e.preventDefault(); box.value = hist[++histAt]; grow(); return; }
+  if (e.key === 'ArrowDown' && histAt >= 0 && box.selectionStart === box.value.length) { e.preventDefault(); box.value = histAt > 0 ? hist[--histAt] : ((histAt = -1), ''); grow(); return; }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
 });
 $('go').onclick = send;
@@ -226,12 +265,55 @@ addEventListener('dragleave', (e) => { if (!e.relatedTarget) $('drop').classList
 addEventListener('drop', (e) => { e.preventDefault(); $('drop').classList.remove('drop'); for (const f of e.dataTransfer.files) { const p = fleetChat.pathOf(f); if (p) files.push(p); } chips(); });
 
 // ---------- header and sidebar ----------
+const MODES = [
+  ['default', 'Manual', 'Asks before every change and command'],
+  ['acceptEdits', 'Auto-edit', 'Edits files without asking; still asks for commands'],
+  ['auto', 'Auto', 'Claude decides what is safe to run on its own'],
+  ['plan', 'Plan', 'Reads and plans only; changes nothing'],
+  ['bypassPermissions', 'Allow all', 'Never asks. Use only in a folder you trust'],
+];
+const MODELS = [['', 'Default model', 'What your Claude plan picks'], ['sonnet', 'Sonnet', 'Fast and capable for most work'], ['opus', 'Opus', 'Strongest, slower, uses the plan faster'], ['haiku', 'Haiku', 'Fastest and lightest']];
+let curMode = 'default', curModel = '';
+function pop(anchor, build) {
+  const p = $('pop'); if (p.classList.contains('show') && p.dataset.for === anchor.id) { closePop(); return; }
+  p.replaceChildren(); p.dataset.for = anchor.id; build(p); const r = anchor.getBoundingClientRect();
+  p.classList.add('show'); p.style.left = Math.max(8, Math.min(r.left, innerWidth - p.offsetWidth - 8)) + 'px'; p.style.top = Math.max(8, r.top - p.offsetHeight - 8) + 'px';
+  document.querySelectorAll('.chip2').forEach((c) => c.setAttribute('aria-expanded', String(c === anchor)));
+}
+function closePop() { $('pop').classList.remove('show'); delete $('pop').dataset.for; document.querySelectorAll('.chip2').forEach((c) => c.setAttribute('aria-expanded', 'false')); }
+document.addEventListener('click', (e) => { if (!$('pop').contains(e.target) && !e.target.closest('.chip2')) closePop(); });
+function choose(anchor, list, cur, apply) {
+  pop(anchor, (p) => { for (const [id, name, desc] of list) { const it = h('div', 'it' + (id === cur ? ' cur' : ''), null, p); it.tabIndex = 0; h('b', null, name, it); h('span', null, desc, it); const go = () => { closePop(); apply(id); }; it.onclick = go; it.onkeydown = (ev) => { if (ev.key === 'Enter') go(); }; } });
+}
+const openModes = () => choose($('modeChip'), MODES, curMode, (m) => fleetChat.setPermissionMode(m));
+const openModels = () => choose($('modelChip'), MODELS, curModel, (m) => fleetChat.setModel(m));
+const THINK = [[null, 'Thinking: normal', 'Claude decides how much to think'], [0, 'Thinking: off', 'Fastest, no extended thinking'], [8000, 'Thinking: deeper', 'Up to 8k thinking tokens'], [31999, 'Thinking: maximum', 'Up to 32k thinking tokens, slower']];
+let curThink = null;
+$('thinkChip').onclick = () => choose($('thinkChip'), THINK.map(([v, n, d]) => [String(v), n, d]), String(curThink), (v) => { curThink = v === 'null' ? null : Number(v); $('thinkText').textContent = THINK.find((x) => String(x[0]) === v)[1]; fleetChat.thinking(curThink); });
+$('modeChip').onclick = openModes; $('modelChip').onclick = openModels;
 function paintState(s) {
   $('folderName').textContent = s.cwd; $('folder').title = s.cwd;
-  document.querySelectorAll('#modes button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === s.permissionMode)));
+  curMode = s.permissionMode || 'default'; curModel = ['sonnet', 'opus', 'haiku'].find((x) => String(s.model || '').includes(x)) || '';
+  const m = MODES.find((x) => x[0] === curMode) || MODES[0]; $('modeText').textContent = m[1]; $('modeChip').className = 'chip2 mode-' + curMode;
+  $('modelText').textContent = (MODELS.find((x) => x[0] === curModel) || MODELS[0])[1];
 }
-document.querySelectorAll('#modes button').forEach((b) => (b.onclick = () => fleetChat.setPermissionMode(b.dataset.mode)));
-$('model').onchange = () => fleetChat.setModel($('model').value);
+async function paintContext() {
+  const c = await fleetChat.context(); if (!c) return; $('ctxRing').style.setProperty('--p', c.pct); $('ctxRing').classList.toggle('hot', c.pct >= 85);
+  $('ctxText').textContent = c.pct + '%'; $('ctxChip').title = 'Context: ' + c.used.toLocaleString() + ' of ' + c.max.toLocaleString() + ' tokens. Click for usage.';
+}
+$('ctxChip').onclick = async () => {
+  const [c, u] = await Promise.all([fleetChat.context(), fleetChat.usage()]);
+  pop($('ctxChip'), (p) => {
+    h('div', 'sec', 'This chat', p);
+    const row = (k, v) => { const r = h('div', 'row', null, p); r.append(k); h('b', null, v, r); };
+    if (c) { row('Context used', c.used.toLocaleString() + ' / ' + c.max.toLocaleString() + ' (' + c.pct + '%)'); const b = h('div', 'bar', null, p); h('i', null, null, b).style.width = Math.min(100, c.pct) + '%'; }
+    if (u && u.session) { row('Cost so far', '$' + (u.session.total_cost_usd || 0).toFixed(3)); row('Lines changed', '+' + (u.session.total_lines_added || 0) + ' / −' + (u.session.total_lines_removed || 0)); }
+    if (u && u.rate_limits) { h('div', 'sec', 'Your Claude plan' + (u.subscription_type ? ' (' + u.subscription_type + ')' : ''), p); for (const [k, lab] of [['five_hour', '5-hour window'], ['seven_day', '7-day window']]) { const w = u.rate_limits[k]; if (w && w.utilization != null) { row(lab, Math.round(w.utilization) + '% used'); const b = h('div', 'bar', null, p); h('i', null, null, b).style.width = Math.min(100, w.utilization) + '%'; } } }
+    if (!c && !u) h('div', 'row', 'Send a message first; usage appears once a chat is running.', p);
+    const cp = h('div', 'it', null, p); h('b', null, 'Compact this chat', cp); h('span', null, 'Summarize it to free up context', cp); cp.onclick = () => { closePop(); box.value = '/compact'; send(); };
+  });
+};
+box.addEventListener('keydown', (e) => { if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); const i = MODES.findIndex((x) => x[0] === curMode); fleetChat.setPermissionMode(MODES[(i + 1) % MODES.length][0]); } });
 $('new').onclick = newChat;
 $('dash').onclick = () => fleetChat.openDashboard();
 $('folder').onclick = async (e) => {
@@ -277,10 +359,10 @@ function meta(d) {
   cmds = d.commands; const c = $('cmds'); c.replaceChildren();
   for (const x of cmds.slice(0, 60)) { const e = h('div', 'cmd', '/' + x.name, c); e.title = x.description; e.onclick = () => { box.value = '/' + x.name + ' '; box.focus(); }; }
   const m = $('mcp'); m.replaceChildren(); if (!d.mcp.length) h('div', 'kv', 'none configured', m).style.color = 'var(--faint)';
-  for (const s of d.mcp) { const k = h('div', 'kv', null, m); h('span', 'dot' + (s.status === 'connected' ? '' : ' off'), null, k); k.append(s.name); k.title = s.status; }
+  for (const s of d.mcp) { const k = h('div', 'kv mcp-row', null, m); h('span', 'dot' + (s.status === 'connected' ? '' : ' off'), null, k); k.append(s.name); k.title = s.status + '. Click to turn ' + (s.status === 'disabled' ? 'on' : 'off'); k.onclick = () => fleetChat.mcpToggle({ name: s.name, on: s.status === 'disabled' }); }
 }
 function followDashboard(d) {
-  const r = document.documentElement; r.dataset.theme = d.style; r.dataset.mode = d.mode;
+  const r = document.documentElement; r.classList.remove('pending'); r.dataset.theme = d.style; r.dataset.mode = d.mode;
   for (const [k, v] of Object.entries(d.tokens || {})) r.style.setProperty('--' + k, v);
   const rc = parseFloat((d.tokens || {})['r-control']); r.style.setProperty('--rk', Number.isFinite(rc) ? String(Math.min(1.6, rc / 6)) : '1');
   r.style.setProperty('--rpill', Number.isFinite(rc) && rc < 3 ? rc + 'px' : '999px');

@@ -145,7 +145,9 @@ function chatContents() { return [chatWin, chatView].filter((x) => x && !(x.isDe
 function ensureChatView() {
   if (chatView) return chatView;
   chatView = new WebContentsView({ webPreferences: CHAT_PREFS() });
-  lockChat(chatView.webContents); chatView.webContents.loadFile(path.join(__dirname, 'chat.html'), { query: { embedded: '1' } });
+  const bg = (lastTheme && lastTheme.tokens.bg) || '#0f0e0b'; chatView.setBackgroundColor(bg); // no white flash before the page paints
+  const query = { embedded: '1' }; if (lastTheme) { query.theme = lastTheme.style; query.mode = lastTheme.mode; if (/^#[0-9a-f]{3,8}$/i.test(bg)) query.bg = bg; }
+  lockChat(chatView.webContents); chatView.webContents.loadFile(path.join(__dirname, 'chat.html'), { query });
   chatView.webContents.on('did-finish-load', () => { if (lastTheme) chatView.webContents.send('chat:event', 'theme', lastTheme); });
   return chatView;
 }
@@ -178,12 +180,19 @@ function setupChat() {
   h('answer', (a) => engine.answer(a.id, !!a.allow, !!a.always, a.input));
   h('interrupt', () => engine.interrupt());
   h('setModel', (m) => engine.setModel(String(m || '')));
-  h('setPermissionMode', (m) => engine.setPermissionMode(['default', 'acceptEdits', 'plan', 'bypassPermissions'].includes(m) ? m : 'default'));
+  h('setPermissionMode', (m) => engine.setPermissionMode(['default', 'acceptEdits', 'plan', 'bypassPermissions', 'auto'].includes(m) ? m : 'default'));
   h('state', () => engine.state());
   h('newChat', () => { engine.reset(); push('state', engine.state()); });
   h('sessions', () => engine.sessions().catch(() => []));
   h('resume', (id) => engine.resume(String(id)));
   h('openDashboard', () => { hideChatView(); open(); });
+  h('context', () => engine.context());
+  h('rewind', (a) => engine.rewind(String(a.uuid), !!a.dry));
+  h('thinking', (n) => engine.setThinking(n === null ? null : Math.max(0, Math.min(63999, Number(n) || 0))));
+  h('mcpToggle', (a) => engine.toggleMcp(String(a.name), !!a.on));
+  h('files', (q) => engine.files(q));
+  h('openPath', (p) => { p = String(p || ''); const full = path.isAbsolute(p) ? p : path.join(engine.state().cwd, p); if (fs.existsSync(full)) shell.showItemInFolder(full); });
+  h('usage', () => engine.usage());
   h('claude', () => setup.claudeStatus());
   h('claudeLogin', () => setup.claudeLogin());
   h('folders', () => {
@@ -205,7 +214,7 @@ function setupChat() {
     const tokens = {}; // only plain design values are passed on
     for (const [k, v] of Object.entries(s.tokens || {})) if (/^[a-z0-9-]{1,30}$/.test(k) && typeof v === 'string' && v.length < 400 && !/[<>;{}]/.test(v)) tokens[k] = v;
     lastTheme = { style: ['andon', 'cyberpunk', 'tmzm'].includes(s.style) ? s.style : 'andon', mode: s.mode === 'light' ? 'light' : 'dark', tokens };
-    if (chatView && !chatView.webContents.isDestroyed()) chatView.webContents.send('chat:event', 'theme', lastTheme);
+    if (chatView && !chatView.webContents.isDestroyed()) { chatView.webContents.send('chat:event', 'theme', lastTheme); if (/^#[0-9a-f]{3,8}$/i.test(tokens.bg || '')) chatView.setBackgroundColor(tokens.bg); }
   });
   ipcMain.handle('shell:chatHide', (e) => { if (fromDashboard(e)) hideChatView(); });
 }

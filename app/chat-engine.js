@@ -73,7 +73,7 @@ function createEngine({ send, cwd, claudePath }) {
     const { query } = await sdk();
     inbox = queue(); abort = new AbortController(); running = true;
     const options = {
-      cwd: state.cwd, abortController: abort, canUseTool, includePartialMessages: true,
+      cwd: state.cwd, abortController: abort, canUseTool, includePartialMessages: true, enableFileCheckpointing: true,
       permissionMode: state.permissionMode, settingSources: ['user', 'project', 'local'],
       systemPrompt: { type: 'preset', preset: 'claude_code' },
       ...(state.model ? { model: state.model } : {}), ...(resume ? { resume } : {}), ...(claudePath ? { pathToClaudeCodeExecutable: claudePath } : {}),
@@ -86,8 +86,14 @@ function createEngine({ send, cwd, claudePath }) {
     state: () => ({ ...state, running }),
     async say({ text, files }) {
       if (!running) await start(state.sessionId || undefined);
-      inbox.push({ type: 'user', message: { role: 'user', content: content(text, files) }, parent_tool_use_id: null });
+      const uuid = require('node:crypto').randomUUID();
+      inbox.push({ type: 'user', uuid, message: { role: 'user', content: content(text, files) }, parent_tool_use_id: null });
+      return uuid;
     },
+    async rewind(uuid, dry) { if (!q) return { canRewind: false, error: 'Start a chat first.' }; try { return await q.rewindFiles(uuid, { dryRun: !!dry }); } catch (e) { return { canRewind: false, error: String((e && e.message) || e) }; } },
+    async setThinking(tokens) { state.thinking = tokens; if (q) await q.setMaxThinkingTokens(tokens); },
+    async toggleMcp(name, on) { if (q) { await q.toggleMcpServer(name, !!on); refreshMeta(); } },
+    files(query) { return listFiles(state.cwd, String(query || '')); },
     answer,
     interrupt() { if (q) q.interrupt().catch(() => {}); },
     async setModel(model) { state.model = model; if (q) await q.setModel(model || undefined); send('state', { ...state }); },
@@ -99,8 +105,25 @@ function createEngine({ send, cwd, claudePath }) {
       this.reset(); state.sessionId = id; send('state', { ...state });
       try { const s = await sdk(); return { messages: await s.getSessionMessages(id, { dir: state.cwd }) }; } catch { return { messages: [] }; }
     },
+    async context() { if (!q) return null; try { const c = await q.getContextUsage({ detail: 'summary' }); return { used: c.totalTokens, max: c.maxTokens, pct: Math.round(c.percentage) }; } catch { return null; } },
+    async usage() {
+      if (!q) return null;
+      try { const u = await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true }); return JSON.parse(JSON.stringify(u)); } catch { return null; }
+    },
     async compact() { return this.say({ text: '/compact' }); },
   };
+}
+
+// file names under the working folder for @-mentions; skips heavy folders, cached for a few seconds
+let fileCache = { dir: '', at: 0, list: [] };
+function listFiles(dir, q) {
+  if (fileCache.dir !== dir || Date.now() - fileCache.at > 20000) {
+    const out = [], skip = new Set(['node_modules', '.git', 'dist', 'dist-installer', '.angular', '.next', 'coverage', '__pycache__']);
+    const walk = (d, depth) => { if (out.length > 6000 || depth > 6) return; let ents = []; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (skip.has(e.name)) continue; const full = path.join(d, e.name); if (e.isDirectory()) walk(full, depth + 1); else out.push(path.relative(dir, full).split(path.sep).join('/')); } };
+    walk(dir, 0); fileCache = { dir, at: Date.now(), list: out };
+  }
+  const k = q.toLowerCase();
+  return fileCache.list.filter((f) => f.toLowerCase().includes(k)).sort((a, b) => a.length - b.length).slice(0, 30);
 }
 
 module.exports = { createEngine };

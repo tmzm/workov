@@ -4,6 +4,11 @@
   try { theme = localStorage.getItem('chat.theme') || theme; mode = localStorage.getItem('chat.mode') || ''; } catch (e) { /* private window */ }
   if (!/^(andon|cyberpunk|tmzm)$/.test(theme)) theme = 'tmzm';
   if (mode !== 'dark' && mode !== 'light') mode = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-  if (/[?&]embedded=1/.test(location.search)) r.classList.add('embedded');
+  var q = new URLSearchParams(location.search);
+  if (q.get('embedded') === '1') {
+    r.classList.add('embedded');
+    if (/^(andon|cyberpunk|tmzm)$/.test(q.get('theme') || '')) { theme = q.get('theme'); mode = q.get('mode') === 'light' ? 'light' : 'dark'; if (/^#[0-9a-f]{3,8}$/i.test(q.get('bg') || '')) r.style.setProperty('--bg', q.get('bg')); }
+    else { r.classList.add('pending'); setTimeout(function () { r.classList.remove('pending'); }, 800); }
+  }
   r.setAttribute('data-theme', theme); r.setAttribute('data-mode', mode);
 })();

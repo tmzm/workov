@@ -32,13 +32,6 @@
     <div class="brand"><span class="logo">E</span>Ejad Chat</div>
     <button class="pill" id="folder" title="Folder Claude works in"><svg><use href="#i-folder"/></svg><span id="folderName"></span></button>
     <button class="pill" id="claudeChip" title="Claude account"><span class="dot off" id="claudeDot"></span><span id="claudeText">Claude</span></button>
-    <div class="seg" role="group" aria-label="Permissions" id="modes">
-      <button data-mode="default" aria-pressed="true" title="Asks before every change">Ask first</button>
-      <button data-mode="acceptEdits" aria-pressed="false" title="Edits files without asking">Auto-edit</button>
-      <button data-mode="plan" aria-pressed="false" title="Plans only, changes nothing">Plan</button>
-      <button data-mode="bypassPermissions" aria-pressed="false" title="Never asks">Allow all</button>
-    </div>
-    <select id="model" aria-label="Model"><option value="">Default model</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option></select>
     <span class="grow"></span>
     <span class="work" id="work"><span class="spin"></span>Working</span>
     <select id="theme" aria-label="Theme"><option value="andon">Andon</option><option value="cyberpunk">Cyberpunk</option><option value="tmzm">Tmzm</option></select>
@@ -58,12 +51,17 @@
     <button class="icon-btn jump" id="jump" aria-label="Jump to the latest message"><svg style="transform:rotate(90deg)"><use href="#i-chev"/></svg></button>
     <div class="composer">
       <div class="menu" id="folderMenu" role="menu" aria-label="Working folder" style="position:fixed;bottom:auto;left:16px;top:60px;width:min(520px,calc(100% - 32px));max-height:70vh;overflow:auto;z-index:70"></div>
+      <div class="menu" id="pop" role="menu" style="position:fixed;bottom:auto;z-index:80;width:min(340px,calc(100% - 24px));max-height:60vh;overflow:auto"></div>
       <div class="menu" id="menu" role="listbox" aria-label="Slash commands"></div>
       <div class="box" id="drop">
         <div class="chips" id="chips"></div>
         <textarea class="input" id="box" rows="1" aria-label="Message" placeholder="Ask anything. Type / for commands, drop or paste files and images."></textarea>
         <div class="tools">
           <button class="icon-btn" id="attach" aria-label="Attach files or images"><svg><use href="#i-clip"/></svg></button>
+          <button class="chip2" id="modeChip" aria-haspopup="menu" title="Permission mode (Shift+Tab cycles)"><span id="modeText">Manual</span></button>
+          <button class="chip2" id="modelChip" aria-haspopup="menu" title="Model"><span id="modelText">Default model</span></button>
+          <button class="chip2" id="thinkChip" aria-haspopup="menu" title="Extended thinking"><span id="thinkText">Thinking: normal</span></button>
+          <button class="chip2" id="ctxChip" aria-haspopup="dialog" title="Context used. Click for usage."><span class="ring" id="ctxRing"></span><span id="ctxText">0%</span></button>
           <button class="send" id="go" aria-label="Send"><svg id="goIcon"><use href="#i-send"/></svg></button>
         </div>
       </div>
