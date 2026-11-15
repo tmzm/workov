@@ -1,0 +1,35 @@
+#pvp { position: fixed; inset: 0; z-index: 900; background: var(--bg); color: var(--text); overflow-y: auto; font-family: var(--font-ui); }
+#pvp[hidden] { display: none; }
+#pvp .pvp-wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; }
+#pvp .pvp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+#pvp h2 { margin: 0; font-size: 1.4rem; }
+#pvp .pvp-sub { color: var(--text-muted); font-size: 0.85rem; }
+#pvp .pvp-spacer { flex: 1; }
+#pvp .pvp-plan { background: var(--readout-bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; display: grid; gap: 8px; }
+#pvp .pvp-plan h3 { margin: 0; font-size: 1rem; }
+#pvp .pvp-plan p { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
+#pvp .pvp-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+#pvp select, #pvp input { background: var(--surface-2, var(--readout-bg)); color: var(--text); border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 10px; font: inherit; max-width: 100%; }
+#pvp #pvp-planner { min-width: min(360px, 100%); }
+#pvp #pvp-search { flex: 1; min-width: 180px; max-width: 360px; }
+#pvp .pvp-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; }
+#pvp .pvp-chip { background: transparent; color: var(--text-muted); border: 1px solid var(--line-strong); border-radius: 999px; padding: 5px 12px; cursor: pointer; font: inherit; font-size: 0.85rem; }
+#pvp .pvp-chip[aria-pressed="true"] { background: var(--text); color: var(--text-on-lamp); border-color: var(--text); }
+#pvp .pvp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+#pvp .pvp-card { background: var(--readout-bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; align-content: start; }
+#pvp .pvp-card.on { border-color: var(--lamp-run); }
+#pvp .pvp-top { display: flex; align-items: center; gap: 10px; }
+#pvp .pvp-av { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; color: #fff; flex: none; }
+#pvp .pvp-tt { min-width: 0; flex: 1; }
+#pvp .pvp-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#pvp .pvp-id { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#pvp .pvp-badge.ok { background: var(--lamp-run); color: var(--text-on-lamp); border-radius: 999px; padding: 2px 9px; font-size: 0.72rem; font-weight: 600; flex: none; }
+#pvp .pvp-meta { display: flex; gap: 10px; color: var(--text-muted); font-size: 0.8rem; }
+#pvp .pvp-free { color: var(--lamp-run); }
+#pvp .pvp-act { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+#pvp .pvp-key { flex: 1; min-width: 100px; }
+#pvp a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+#pvp .pvp-empty { color: var(--text-muted); }
+#pvp #pvp-more { margin: 16px auto 0; display: block; }
+#pvp button:focus-visible, #pvp a:focus-visible, #pvp input:focus-visible, #pvp select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 520px) { #pvp .pvp-grid { grid-template-columns: 1fr; } }

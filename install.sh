@@ -58,7 +58,7 @@ fi
 
 # 4. the Ejad layer: overlay files, then patches (after setup, which regenerates agent files)
 cp -R "$HERE/overlay/." "$TARGET/"
-for p in ejad-agents ejad-worker ejad-dashboard ejad-agent-logs ejad-agent-roster ejad-decision-help ejad-delegate ejad-windows ejad-designer ejad-land-branch; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
+for p in ejad-agents ejad-worker ejad-dashboard ejad-agent-logs ejad-agent-roster ejad-decision-help ejad-dashboard-providers2 ejad-dashboard-connect ejad-dashboard-providers-page ejad-dashboard-providers-tab ejad-dashboard-providers-v2 ejad-dashboard-keystore ejad-dashboard-issue ejad-dashboard-answered ejad-delegate ejad-windows ejad-designer ejad-dashboard-agentmodels ejad-land-branch; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
 
 # A running OpenCode background server keeps the agent list it loaded at start: without a reload, new agents such
 # as `worker` fail with "Agent not found" when the router dispatches them.
