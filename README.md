@@ -25,6 +25,19 @@ git clone <this repo> ~/ejad-fleet
 bash ~/ejad-fleet/install.sh /e/Projects/Ejad/dashboard --worker-fleet <worker-fleet folder or git URL>
 ```
 
+Tested with worker-fleet config schema `4.0.0` plus the unreleased dashboard additions (Ring view, ticket done
+time, per-ticket run summary: upstream tickets 091–093). The patches anchor on upstream text and stop with
+"anchor missing" if a newer worker-fleet changed it.
+
+Windows notes: the patches make the watchdog, wake watcher and dashboard run on Windows (Git Bash, never WSL bash),
+show OpenCode agent sessions in each ticket's Logs tab, and `.claude/scripts/ejad-router-loop.sh` keeps the
+OpenCode router cycling without a terminal (`bash .claude/scripts/ejad-router-loop.sh`).
+
+Planning on the fleet: `/ejadtask` hands planning to the Claude ticket writer `ejad-planner`
+(`overlay/.claude/agents/ejad-planner.md`, Sonnet), started by
+`node .claude/scripts/ejad-plan.cjs <NNN-slug> job/briefs/<NNN>.md`. The ticket shows as `specifying` with the writer
+as its agent, and every planner step streams into `job/logs/<NNN>-planner.log`, which is the ticket's Logs tab.
+
 The installer:
 1. installs worker-fleet into the repo, then restores any file the team tracks (the team's files always win);
 2. sets the models (OpenCode Go: router `glm-5.3`, workers `kimi-k2.7-code`, reviewer `deepseek-v4-pro`, the rest

@@ -1,0 +1,52 @@
+
+/* ---- the live chat: pieces the static mockup did not need ---- */
+html,body{height:100%}
+.app{height:100vh}
+.col{padding-bottom:8px}
+.msg-err{border:1px solid var(--bad);color:var(--bad);border-radius:calc(10px*var(--rk));padding:10px 14px;background:color-mix(in srgb,var(--bad) 10%,transparent);white-space:pre-wrap}
+.note{align-self:center;color:var(--faint);font-size:12.5px}
+.body h1,.body h2,.body h3,.body h4{margin:6px 0 0;line-height:1.3}
+.body h1{font-size:1.25em}.body h2{font-size:1.15em}.body h3,.body h4{font-size:1.05em}
+.body a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.body blockquote{margin:0;padding-left:12px;border-left:3px solid var(--line2);color:var(--dim)}
+.body .code{border:1px solid var(--line);border-radius:calc(10px*var(--rk));overflow:hidden}
+.body .code .lang{display:flex;justify-content:space-between;align-items:center;padding:4px 12px;font-size:11.5px;color:var(--faint);background:var(--raised);border-bottom:1px solid var(--line)}
+.body .code button{border:0;background:none;color:var(--faint);font-size:11.5px;padding:2px 6px;border-radius:5px}
+.body .code button:hover{color:var(--text);background:var(--surface)}
+.think-body{margin:4px 0 0 20px;padding-left:12px;border-left:2px solid var(--line2);color:var(--faint);font-style:italic;white-space:pre-wrap;display:none}
+.think[aria-expanded=true]+.think-body{display:block}
+.tool .state .spin{margin:0}
+.tool.err .state{color:var(--bad)}
+.tool .detail .lbl{padding:6px 14px 0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);background:var(--code)}
+.todo .row{align-items:flex-start}
+.perm pre{border-top:1px solid var(--line)}
+.perm.done{opacity:.6;box-shadow:none;border-color:var(--line)}
+.perm.done .acts{display:none}
+.perm .res{padding:8px 14px;font-size:12.5px;color:var(--dim);border-top:1px solid var(--line)}
+.top select{height:32px;border:1px solid var(--line);border-radius:var(--rpill);background:var(--bg);color:var(--dim);padding:0 10px;font:inherit;font-size:12.5px}
+.top select:hover{border-color:var(--accent)}
+.sess{cursor:pointer}
+.empty{margin:auto;text-align:center;color:var(--faint);padding:40px 20px}
+.empty h2{margin:0 0 6px;color:var(--text);font-size:1.3em}
+.empty .sug{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+.empty .sug button{border:1px solid var(--line2);background:var(--surface);border-radius:var(--rpill);padding:6px 12px;color:var(--dim);transition:border-color .18s,color .18s}
+.empty .sug button:hover{border-color:var(--accent);color:var(--text)}
+.input{width:100%;display:block;resize:none;border:0;outline:0;background:none;font:inherit;max-height:200px;min-height:48px}
+.input::placeholder{color:var(--faint)}
+.box.drop{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.menu .it{cursor:pointer}
+.jump{position:absolute;right:28px;bottom:150px;display:none}
+.jump.show{display:grid}
+.work{display:none;align-items:center;gap:8px;color:var(--faint);font-size:12.5px}
+.work.show{display:flex}
+
+/* inside the dashboard's Chat tab: no second app chrome, the dashboard's own bar and theme are in charge */
+.embedded .brand,.embedded #theme,.embedded #mode,.embedded #dash{display:none}
+.embedded .top{padding:6px 14px;min-height:0}
+.embedded body,.embedded .app{background:var(--bg)}
+
+.pill.warn{border-color:var(--lamp-attn,#e8a33d);color:var(--text)}
+.pill.warn .dot{background:var(--lamp-attn,#e8a33d)}
+#folderMenu .it{display:block}#folderMenu .it span{display:block;color:var(--faint);font-size:12px;white-space:normal;word-break:break-all}
+#folderMenu .it b{font-family:var(--sans);color:var(--text)}
+#folderMenu .it.cur{background:var(--accent-soft)}

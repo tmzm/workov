@@ -1,0 +1,68 @@
+{
+  "name": "ejad-fleet-app",
+  "productName": "Ejad Fleet",
+  "version": "0.1.0",
+  "description": "Windows launcher for the Ejad worker fleet: starts with Windows, keeps the dashboard, router and tunnel running, shows the dashboard in its own window.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "icon": "node make-icon.js",
+    "start": "electron .",
+    "selftest": "electron . --selftest",
+    "pack": "node make-icon.js && node build.js",
+    "dist": "node make-icon.js && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^26.18.0",
+    "rcedit": "^5.0.2"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.325"
+  },
+  "build": {
+    "appId": "net.ejad.fleet",
+    "productName": "Ejad Fleet",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "electronVersion": "33.4.11",
+    "files": [
+      "main.js",
+      "chat-engine.js",
+      "preload.js",
+      "shell-preload.js",
+      "setup.js",
+      "setup.html",
+      "setup-page.js",
+      "setup-preload.js",
+      "chat.js",
+      "chat-md.js",
+      "chat-boot.js",
+      "chat.html",
+      "chat.css",
+      "loading.html",
+      "icon.png",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/@anthropic-ai/claude-agent-sdk-win32-x64/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ejad Fleet",
+      "uninstallDisplayName": "Ejad Fleet",
+      "runAfterFinish": true
+    }
+  }
+}

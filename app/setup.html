@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" data-theme="tmzm" data-mode="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Welcome to Ejad Fleet</title>
+<link rel="stylesheet" href="chat.css">
+<style>
+body{display:block;overflow:auto}
+.wrap{max-width:680px;margin:0 auto;padding:36px 24px}
+h1{margin:0 0 4px;font-size:1.7em;letter-spacing:-.01em}
+.lead{color:var(--dim);margin:0 0 22px}
+.step{display:flex;gap:14px;align-items:flex-start;padding:14px;margin-bottom:10px;border:1px solid var(--line);border-radius:calc(12px*var(--rk));background:var(--surface)}
+.step.primary{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.mark{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;font-weight:700;background:var(--raised);color:var(--faint)}
+.ok .mark{background:var(--ok);color:#06210f}.bad .mark{background:var(--bad);color:#2a0a07}
+.info{flex:1;min-width:0}.info b{display:block}.info span{color:var(--dim);font-size:13px;word-break:break-word}
+.opt{font-size:11px;color:var(--faint);margin-left:6px;font-weight:400}
+.foot{display:flex;gap:10px;align-items:center;margin-top:20px;flex-wrap:wrap}
+.foot .grow{flex:1}
+.hint{color:var(--faint);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Welcome to Ejad Fleet</h1>
+  <p class="lead">Claude comes first: the chat, planner and designer run on your Claude account. Then a few tools the fleet needs. Everything updates by itself when you fix a step.</p>
+  <div id="list" role="list"></div>
+  <div class="foot">
+    <button class="btn" id="recheck">Check again</button>
+    <button class="btn" id="notify">Test notification</button>
+    <span class="grow"></span>
+    <span class="hint" id="msg"></span>
+    <button class="btn primary" id="go" disabled>Open the dashboard</button>
+  </div>
+</div>
+<script src="setup-page.js"></script>
+</body>
+</html>

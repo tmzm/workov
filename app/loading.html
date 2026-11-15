@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejad Fleet</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; margin: 0; }
+  body { display: grid; place-items: center; background: #0f0e0b; color: #ece9e2; font: 16px/1.5 system-ui, "Segoe UI", sans-serif; }
+  main { text-align: center; padding: 24px; max-width: 28rem; }
+  h1 { margin: 0 0 8px; font-size: 1.6rem; letter-spacing: 0.01em; }
+  h1 span { color: #c9a14a; }
+  p { margin: 0; color: #a29c90; }
+  .bar { height: 3px; width: 180px; margin: 24px auto 0; background: #2e2a22; border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 40%; background: #c9a14a; border-radius: 3px; animation: slide 1.4s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+  @media (prefers-reduced-motion: reduce) { .bar i { animation: none; width: 100%; } }
+</style>
+</head>
+<body>
+<main role="status">
+  <h1><span>{</span> Ejad Fleet <span>}</span></h1>
+  <p>Starting the dashboard, the router and the tunnel…</p>
+  <div class="bar" aria-hidden="true"><i></i></div>
+</main>
+</body>
+</html>
