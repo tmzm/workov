@@ -8,6 +8,6 @@ exports.default = async function afterPack(ctx) {
   const exe = path.join(ctx.appOutDir, ctx.packager.appInfo.productFilename + '.exe');
   await (rcedit.rcedit || rcedit)(exe, {
     icon: path.join(__dirname, 'icon.ico'),
-    'version-string': { ProductName: 'Ejad Fleet', FileDescription: 'Ejad Fleet', CompanyName: 'Ejad', OriginalFilename: 'Ejad Fleet.exe' },
+    'version-string': { ProductName: 'Workeve', FileDescription: 'Workeve', CompanyName: 'Ejad', OriginalFilename: 'Workeve.exe' },
   });
 };

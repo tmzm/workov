@@ -56,10 +56,10 @@ T['tmzm'] = ('Tmzm', """
 """)
 
 for k, (name, tokens, extra) in T.items():
-    out = src.replace('@T@', k).replace('<title>Ejad Chat mockup</title>', '<title>Ejad Chat mockup: %s</title>' % name)
+    out = src.replace('@T@', k).replace('<title>Workeve Chat mockup</title>', '<title>Workeve Chat mockup: %s</title>' % name)
     out = out.replace('</style>', tokens + extra + '</style>', 1)
-    out = out.replace('<div class="brand"><span class="logo">E</span>Ejad Chat</div>',
-                      '<div class="brand"><span class="logo">E</span>Ejad Chat <span style="font-weight:400;color:var(--faint);font-size:12px;margin-left:4px">%s</span></div>' % name)
+    out = out.replace('<div class="brand"><span class="logo">E</span>Workeve Chat</div>',
+                      '<div class="brand"><span class="logo">E</span>Workeve Chat <span style="font-weight:400;color:var(--faint);font-size:12px;margin-left:4px">%s</span></div>' % name)
     open(os.path.join(HERE, 'chat-mockup-%s.html' % k), 'w', encoding='utf-8', newline='\n').write(out)
 print('generated', ', '.join(T))
 

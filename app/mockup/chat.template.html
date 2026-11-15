@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src data:">
-<title>Ejad Chat</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src data: blob:; connect-src 'self'">
+<title>Workeve Chat</title>
 <script src="chat-boot.js"></script>
 <link rel="stylesheet" href="chat.css">
 </head>
@@ -12,7 +12,7 @@
 <!--SPRITE-->
 <div class="app">
   <header class="top">
-    <div class="brand"><span class="logo">E</span>Ejad Chat</div>
+    <div class="brand"><span class="logo" role="img" aria-label="Workeve"></span>Workeve Chat</div>
     <button class="pill" id="folder" title="Folder Claude works in"><svg><use href="#i-folder"/></svg><span id="folderName"></span></button>
     <button class="pill" id="claudeChip" title="Claude account"><span class="dot off" id="claudeDot"></span><span id="claudeText">Claude</span></button>
     <span class="grow"></span>
@@ -40,6 +40,7 @@
         <div class="chips" id="chips"></div>
         <textarea class="input" id="box" rows="1" aria-label="Message" placeholder="Ask anything. Type / for commands, drop or paste files and images."></textarea>
         <div class="tools">
+          <input type="file" id="fileIn" multiple hidden>
           <button class="icon-btn" id="attach" aria-label="Attach files or images"><svg><use href="#i-clip"/></svg></button>
           <button class="chip2" id="modeChip" aria-haspopup="menu" title="Permission mode (Shift+Tab cycles)"><span id="modeText">Manual</span></button>
           <button class="chip2" id="modelChip" aria-haspopup="menu" title="Model"><span id="modelText">Default model</span></button>

@@ -1,4 +1,4 @@
-// First-run checks for the Ejad Fleet app (main process): what is installed, whether Claude is signed in, and the sign-in itself.
+// First-run checks for the Workeve app (main process): what is installed, whether Claude is signed in, and the sign-in itself.
 'use strict';
 const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');

@@ -1,4 +1,4 @@
-// Builds dist/Ejad Fleet-win32-x64/Ejad Fleet.exe without electron-packager (its zip extractor fails silently on some
+// Builds dist/Workeve-win32-x64/Workeve.exe without electron-packager (its zip extractor fails silently on some
 // Windows setups). It copies the Electron runtime, renames electron.exe, and puts the app in resources/app, which is the
 // layout Electron itself documents for an unpacked app. Run `npm run pack`.
 'use strict';
@@ -10,11 +10,11 @@ if (!fs.existsSync(path.join(runtime, 'electron.exe'))) {
   console.error('node_modules/electron/dist/electron.exe is missing. Unzip the cached Electron zip there (see README).');
   process.exit(1);
 }
-const out = path.join('dist', 'Ejad Fleet-win32-x64');
+const out = path.join('dist', 'Workeve-win32-x64');
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 fs.cpSync(runtime, out, { recursive: true });
-fs.renameSync(path.join(out, 'electron.exe'), path.join(out, 'Ejad Fleet.exe'));
+fs.renameSync(path.join(out, 'electron.exe'), path.join(out, 'Workeve.exe'));
 fs.rmSync(path.join(out, 'resources', 'default_app.asar'), { force: true });
 const app = path.join(out, 'resources', 'app');
 fs.mkdirSync(app, { recursive: true });
@@ -23,14 +23,14 @@ for (const f of ['main.js', 'chat-engine.js', 'preload.js', 'shell-preload.js', 
 (async () => {
   try {
     const rcedit = require('rcedit');
-    await (rcedit.rcedit || rcedit)(path.join(out, 'Ejad Fleet.exe'), {
+    await (rcedit.rcedit || rcedit)(path.join(out, 'Workeve.exe'), {
       icon: 'icon.ico',
-      'version-string': { ProductName: 'Ejad Fleet', FileDescription: 'Ejad Fleet', CompanyName: 'Ejad', OriginalFilename: 'Ejad Fleet.exe' },
+      'version-string': { ProductName: 'Workeve', FileDescription: 'Workeve', CompanyName: 'Ejad', OriginalFilename: 'Workeve.exe' },
     });
     console.log('icon and version info stamped on the exe');
   } catch (e) {
     console.log('built without a custom exe icon (' + String(e.message).slice(0, 100) + ')');
   }
   const size = (d) => fs.readdirSync(d, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? size(path.join(d, e.name)) : fs.statSync(path.join(d, e.name)).size), 0);
-  console.log(`built ${path.join(out, 'Ejad Fleet.exe')} (${Math.round(size(out) / 1048576)} MB folder)`);
+  console.log(`built ${path.join(out, 'Workeve.exe')} (${Math.round(size(out) / 1048576)} MB folder)`);
 })();

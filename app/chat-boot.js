@@ -5,6 +5,7 @@
   if (!/^(andon|cyberpunk|tmzm)$/.test(theme)) theme = 'tmzm';
   if (mode !== 'dark' && mode !== 'light') mode = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   var q = new URLSearchParams(location.search);
+  if (q.get('web') === '1') document.write('<script src="chat-web.js"><\/script>');
   if (q.get('embedded') === '1') {
     r.classList.add('embedded');
     if (/^(andon|cyberpunk|tmzm)$/.test(q.get('theme') || '')) { theme = q.get('theme'); mode = q.get('mode') === 'light' ? 'light' : 'dark'; if (/^#[0-9a-f]{3,8}$/i.test(q.get('bg') || '')) r.style.setProperty('--bg', q.get('bg')); }

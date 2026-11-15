@@ -240,3 +240,9 @@ html.embedded.pending body{visibility:hidden}
 .tool .target.link{cursor:pointer;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
 .tool .target.link:hover{color:var(--accent)}
 .mcp-row{cursor:pointer}.mcp-row:hover{color:var(--text)}
+
+.tools{flex-wrap:wrap}
+@media (max-width:600px){.top{gap:6px}#folderName{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chip2{padding:0 8px}.col{padding:0 12px}.composer{padding:0 10px 12px}.hint{display:none}}
+
+/* the Workeve logo */
+.logo{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230f0e0b'/%3E%3Cg fill='%23c9a14a'%3E%3Crect x='18' y='14' width='7' height='5'/%3E%3Crect x='18' y='14' width='4' height='36'/%3E%3Crect x='18' y='45' width='7' height='5'/%3E%3Crect x='13' y='29' width='6' height='6'/%3E%3Crect x='40' y='14' width='7' height='5'/%3E%3Crect x='43' y='14' width='4' height='36'/%3E%3Crect x='40' y='45' width='7' height='5'/%3E%3Crect x='46' y='29' width='6' height='6'/%3E%3Ccircle cx='32' cy='32' r='4.2'/%3E%3C/g%3E%3C/svg%3E") center/cover no-repeat!important;color:transparent!important;font-size:0!important;border-radius:calc(8px*var(--rk))!important;box-shadow:none!important;text-shadow:none!important}

@@ -1,4 +1,4 @@
-// Ejad Chat page. Renders Claude's turn as a timeline, the way the VS Code extension shows it: streamed text, thinking rows,
+// Workeve Chat page. Renders Claude's turn as a timeline, the way the VS Code extension shows it: streamed text, thinking rows,
 // one collapsible row per tool call (diffs for edits, output for commands), a live plan, and Allow/Deny cards.
 'use strict';
 const $ = (id) => document.getElementById(id);
@@ -8,7 +8,7 @@ let files = [], cmds = [], busy = false, stick = true, turn = null, live = {}, t
 
 function svg(name, cls) { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); if (cls) s.setAttribute('class', cls); const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#i-' + name); s.append(u); return s; }
 function h(tag, cls, text, parent) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; if (parent) parent.append(n); return n; }
-const base = (p) => String(p || '').split(/[\\/]/).pop();
+const base = (p) => (p && p.name ? p.name : String(p || '').split(/[\\/]/).pop());
 const json = (o) => { try { return JSON.stringify(o, null, 2); } catch { return String(o); } };
 const typing = h('div', 'typing'); const dots = h('span', 'dots', null, typing); for (let i = 0; i < 3; i++) h('i', null, null, dots);
 const typingText = h('span', null, 'Working', typing), typingTime = h('span', null, '', typing); let typingTimer = 0, typingSince = 0;
@@ -171,7 +171,7 @@ async function rewind(uuid, btn) {
 
 // ---------- permissions ----------
 function permission(d) {
-  clearEmpty(); const c = h('div', 'perm', null, log); c.setAttribute('role', 'alertdialog');
+  clearEmpty(); const c = h('div', 'perm', null, log); c.setAttribute('role', 'alertdialog'); c.dataset.id = d.id;
   const hd = h('div', 'ph', null, c); hd.append(svg('shield'), d.title || (d.displayName + ' needs your permission'));
   if (d.reason) h('div', 'why', d.reason, c);
   const done = (label) => { c.classList.add('done'); h('div', 'res', label, c); };
@@ -217,9 +217,10 @@ async function send() {
   if (text === '/mode') { openModes(); return; }
   if (text === '/usage' || text === '/context') { $('ctxChip').click(); return; }
   const wasBusy = busy; stick = true; setBusy(true);
-  const uuid = await fleetChat.say({ text, files: f }); userBlock(text, f, uuid); if (wasBusy) bottom();
+  try { await fleetChat.say({ text, files: f }); } catch (e) { setBusy(wasBusy); h('div', 'msg-err', String((e && e.message) || e), log); bottom(); }
 }
-async function newChat() { await fleetChat.newChat(); streamed = new Set(); tools = {}; live = {}; todoCard = null; turn = null; setBusy(false); empty(); loadSessions(); }
+function resetView() { streamed = new Set(); tools = {}; live = {}; todoCard = null; turn = null; setBusy(false); empty(); }
+async function newChat() { await fleetChat.newChat(); resetView(); loadSessions(); }
 function grow() { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight, 200) + 'px'; }
 function closeMenu() { $('menu').classList.remove('show'); }
 function menuItems() { return [...$('menu').querySelectorAll('.it')]; }
@@ -258,11 +259,14 @@ box.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
 });
 $('go').onclick = send;
-$('attach').onclick = async () => { files.push(...((await fleetChat.pickFiles()) || [])); chips(); };
-box.addEventListener('paste', (e) => { for (const it of e.clipboardData.items) if (it.kind === 'file') { const p = fleetChat.pathOf(it.getAsFile()); if (p) { files.push(p); chips(); } } });
+function readFile(f) { return new Promise((res) => { const r = new FileReader(); r.onload = () => res({ name: f.name, type: f.type, data: String(r.result).split(',')[1] || '' }); r.readAsDataURL(f); }); }
+async function addFiles(list) { for (const f of list) { if (fleetChat.web) { if (f.size <= 8 * 1024 * 1024) files.push(await readFile(f)); } else { const p = fleetChat.pathOf(f); if (p) files.push(p); } } chips(); }
+$('attach').onclick = async () => { if (fleetChat.web) { $('fileIn').click(); return; } files.push(...((await fleetChat.pickFiles()) || [])); chips(); };
+$('fileIn').onchange = () => { addFiles($('fileIn').files); $('fileIn').value = ''; };
+box.addEventListener('paste', (e) => { const fl = [...e.clipboardData.items].filter((it) => it.kind === 'file').map((it) => it.getAsFile()); if (fl.length) addFiles(fl); });
 for (const ev of ['dragover', 'dragenter']) addEventListener(ev, (e) => { e.preventDefault(); $('drop').classList.add('drop'); });
 addEventListener('dragleave', (e) => { if (!e.relatedTarget) $('drop').classList.remove('drop'); });
-addEventListener('drop', (e) => { e.preventDefault(); $('drop').classList.remove('drop'); for (const f of e.dataTransfer.files) { const p = fleetChat.pathOf(f); if (p) files.push(p); } chips(); });
+addEventListener('drop', (e) => { e.preventDefault(); $('drop').classList.remove('drop'); addFiles(e.dataTransfer.files); });
 
 // ---------- header and sidebar ----------
 const MODES = [
@@ -321,7 +325,7 @@ $('folder').onclick = async (e) => {
   const f = await fleetChat.folders(), r = $('folder').getBoundingClientRect(); m.replaceChildren();
   m.style.top = r.bottom + 6 + 'px'; m.style.left = Math.max(8, r.left) + 'px';
   const row = (title, path, cur) => { const it = h('div', 'it' + (cur ? ' cur' : ''), null, m); it.setAttribute('role', 'menuitem'); it.tabIndex = 0; h('b', null, title, it); h('span', null, path, it); const go = async () => { m.classList.remove('show'); if (await fleetChat.setFolder(path)) newChat(); }; it.onclick = go; it.onkeydown = (ev) => { if (ev.key === 'Enter') go(); }; };
-  const browse = h('div', 'it', null, m); h('b', null, 'Browse for a folder…', browse); browse.tabIndex = 0; browse.onclick = async () => { m.classList.remove('show'); if (await fleetChat.pickFolder()) newChat(); };
+  if (!fleetChat.web) { const browse = h('div', 'it', null, m); h('b', null, 'Browse for a folder…', browse); browse.tabIndex = 0; browse.onclick = async () => { m.classList.remove('show'); if (await fleetChat.pickFolder()) newChat(); }; }
   h('div', 'sec', 'Fleet', m); row('Fleet folder', f.fleet, f.fleet === f.current);
   if (f.worktrees.length) { h('div', 'sec', 'Worker folders (one per ticket)', m); for (const w of f.worktrees) row(w.split(/[\\/]/).pop(), w, w === f.current); }
   if (f.recent.length) { h('div', 'sec', 'Recent', m); for (const w of f.recent) row(w.split(/[\\/]/).pop() || w, w, w === f.current); }
@@ -338,7 +342,7 @@ async function claudeChip() {
   $('claudeChip').title = claudeOk ? 'Signed in to Claude' + (s.org ? ' (' + s.org + ')' : '') + '. Click to switch account.' : 'Chat is locked until you sign in to Claude.';
   box.disabled = !claudeOk; $('go').disabled = !claudeOk && !busy; box.placeholder = claudeOk ? placeholder : 'Sign in to Claude to chat';
 }
-$('claudeChip').onclick = async () => { $('claudeText').textContent = 'Finish in your browser…'; await fleetChat.claudeLogin(); claudeChip(); };
+$('claudeChip').onclick = async () => { if (fleetChat.web) return; $('claudeText').textContent = 'Finish in your browser…'; await fleetChat.claudeLogin(); claudeChip(); };
 claudeChip(); setInterval(claudeChip, 300000); addEventListener('focus', claudeChip);
 function theme(t, mode) {
   const r = document.documentElement; if (t) { r.dataset.theme = t; $('theme').value = t; } if (mode) r.dataset.mode = mode;
@@ -352,7 +356,7 @@ async function loadSessions() {
   if (!list.length) { h('div', 'kv', 'none yet', host).style.color = 'var(--faint)'; return; }
   for (const s of list.slice(0, 15)) {
     const b = h('button', 'sess', String(s.title).slice(0, 60), host); b.type = 'button'; h('small', null, new Date(s.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }), b);
-    b.onclick = async () => { const r = await fleetChat.resume(s.id); log.replaceChildren(); streamed = new Set(); tools = {}; live = {}; todoCard = null; turn = null; for (const m of (r && r.messages) || []) onMessage(m, true); h('div', 'note', 'Resumed. Your next message continues this chat.', log); stick = true; bottom(); };
+    b.onclick = async () => { await fleetChat.resume(s.id); h('div', 'note', 'Resumed. Your next message continues this chat.', log); stick = true; bottom(); };
   }
 }
 function meta(d) {
@@ -370,6 +374,10 @@ function followDashboard(d) {
 }
 fleetChat.on((kind, d) => {
   if (kind === 'theme') followDashboard(d);
+  else if (kind === 'user') { userBlock(d.text, d.files, d.uuid); setBusy(true); }
+  else if (kind === 'reset') resetView();
+  else if (kind === 'hist') onMessage(d, true);
+  else if (kind === 'permissionDone') { const c = log.querySelector('.perm[data-id="' + d.id + '"]:not(.done)'); if (c) { c.classList.add('done'); h('div', 'res', 'Answered', c); } }
   else if (kind === 'message') onMessage(d); else if (kind === 'permission') permission(d); else if (kind === 'meta') meta(d);
   else if (kind === 'state') paintState(d); else if (kind === 'idle') setBusy(false);
   else if (kind === 'error') { setBusy(false); h('div', 'msg-err', String(d), log); bottom(); }

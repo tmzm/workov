@@ -1,4 +1,4 @@
-// Ejad Fleet: Windows launcher (stage 1).
+// Workeve: Windows launcher (stage 1).
 // - starts with Windows (tray), keeps the dashboard + router loop + tunnel running through the fleet's own
 //   start-dashboard.sh (it is idempotent: it reuses a healthy server), restarts them if they die
 // - shows the dashboard in its own window (it is the same page as on the phone, loaded from this computer)
@@ -8,6 +8,7 @@
 const { app, BrowserWindow, Tray, Menu, Notification, shell, nativeImage, dialog, ipcMain, WebContentsView } = require('electron');
 const { createEngine } = require('./chat-engine');
 const setup = require('./setup');
+const { createBridge } = require('./chat-bridge');
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -17,9 +18,12 @@ const SELFTEST = process.argv.includes('--selftest');
 const START_HIDDEN = process.argv.includes('--hidden');
 // EJAD_TEST_DIR gives tests their own data, config and instance lock, so they never touch an installed copy
 if (process.env.EJAD_TEST_DIR) app.setPath('userData', path.join(process.env.EJAD_TEST_DIR, 'userData'));
-const CFG_FILE = path.join(process.env.EJAD_TEST_DIR || app.getPath('appData'), 'EjadFleet', 'config.json');
+const CFG_FILE = path.join(process.env.EJAD_TEST_DIR || app.getPath('appData'), 'Workeve', 'config.json');
 const DEFAULTS = { fleet: 'E:\\Projects\\Ejad\\dashboard-fleet', autostart: true };
 
+// the app used to be called Ejad Fleet: keep its settings
+const OLD_CFG = path.join(path.dirname(path.dirname(CFG_FILE)), 'EjadFleet', 'config.json');
+if (!fs.existsSync(CFG_FILE) && fs.existsSync(OLD_CFG)) { try { fs.mkdirSync(path.dirname(CFG_FILE), { recursive: true }); fs.copyFileSync(OLD_CFG, CFG_FILE); } catch { /* starts fresh */ } }
 let cfg = { ...DEFAULTS };
 try { cfg = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')) }; } catch { /* first run */ }
 const saveCfg = () => { fs.mkdirSync(path.dirname(CFG_FILE), { recursive: true }); fs.writeFileSync(CFG_FILE, JSON.stringify(cfg, null, 2)); };
@@ -109,7 +113,7 @@ async function poll() {
 function open() { if (!win) createWindow(); win.show(); win.focus(); }
 function menu() {
   return Menu.buildFromTemplate([
-    { label: 'Open Ejad Fleet', click: open },
+    { label: 'Open Workeve', click: open },
     { label: 'Open chat in its own window', click: openChat },
     { label: status.text, enabled: false },
     { type: 'separator' },
@@ -119,12 +123,13 @@ function menu() {
     { type: 'separator' },
     { label: 'Start with Windows', type: 'checkbox', checked: !!cfg.autostart, click: (i) => { cfg.autostart = i.checked; saveCfg(); applyLoginItem(); } },
     { label: 'Choose fleet folder…', click: chooseFleet },
+    { label: 'Chat from the phone link', type: 'checkbox', checked: cfg.remoteChat !== false, click: (i) => { cfg.remoteChat = i.checked; saveCfg(); } },
     { label: 'Setup & checks…', click: openSetup },
     { type: 'separator' },
     { label: 'Quit (leaves the fleet running)', click: () => { quitting = true; app.quit(); } },
   ]);
 }
-function updateTray() { if (!tray) return; tray.setToolTip('Ejad Fleet: ' + status.text); tray.setContextMenu(menu()); }
+function updateTray() { if (!tray) return; tray.setToolTip('Workeve: ' + status.text); tray.setContextMenu(menu()); }
 function applyLoginItem() { if (process.env.EJAD_NO_AUTOSTART) return; if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!cfg.autostart, args: ['--hidden'] }); }
 async function chooseFleet(parent) {
   const r = await dialog.showOpenDialog(parent || undefined, { title: 'Choose the fleet folder (it contains specs/worker-fleet.config.json)', properties: ['openDirectory'], defaultPath: cfg.fleet });
@@ -137,7 +142,7 @@ function showPrereq() {
 
 // ---------- the chat (local only: the page talks to this process over IPC, never over the network) ----------
 // One engine, shown in two places: a view laid over the dashboard's Chat tab, and an optional window of its own.
-let chatWin = null, chatView = null, chatViewShown = false, engine = null, lastTheme = null;
+let chatWin = null, chatView = null, chatViewShown = false, engine = null, lastTheme = null, bridge = null;
 const CHAT_PREFS = () => ({ preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true });
 function lockChat(wc) {
   wc.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
@@ -158,7 +163,7 @@ function fromDashboard(e) { return !!win && e.sender === win.webContents && e.se
 function openChat() {
   if (chatWin) { chatWin.show(); chatWin.focus(); return; }
   chatWin = new BrowserWindow({
-    width: 1100, height: 820, minWidth: 420, minHeight: 500, backgroundColor: '#0f0e0b', title: 'Ejad Chat', autoHideMenuBar: true,
+    width: 1100, height: 820, minWidth: 420, minHeight: 500, backgroundColor: '#0f0e0b', title: 'Workeve Chat', autoHideMenuBar: true,
     icon: path.join(__dirname, 'icon.png'), webPreferences: CHAT_PREFS(),
   });
   lockChat(chatWin.webContents);
@@ -171,6 +176,7 @@ function rememberFolder(p) { cfg.chatCwd = p; cfg.chatRecent = [p, ...(cfg.chatR
 function setupChat() {
   const push = (kind, data) => {
     for (const w of chatContents()) w.send('chat:event', kind, data);
+    if (bridge) bridge.publish(kind, data);
     const seen = (chatWin && chatWin.isVisible() && chatWin.isFocused()) || (chatViewShown && win && win.isVisible() && win.isFocused());
     if (kind === 'permission' && !seen) toast('Claude is waiting for your permission', String(data.title || data.displayName || data.toolName).slice(0, 120), () => { if (chatViewShown || !chatWin) open(); else openChat(); });
     if (kind === 'message' && data.type === 'result' && !seen) toast('Claude finished', data.is_error ? 'The turn ended with an error.' : String(data.result || 'Done').slice(0, 120), open);
@@ -178,31 +184,37 @@ function setupChat() {
   engine = createEngine({ send: push, cwd: cfg.chatCwd || path.dirname(cfg.fleet), claudePath: bundledClaude() });
   const own = (e) => chatContents().some((w) => w === e.sender); // only our own chat pages may call these
   const h = (name, fn) => ipcMain.handle('chat:' + name, (e, a) => (own(e) ? fn(a, e) : null));
-  h('say', (a) => engine.say({ text: String((a && a.text) || ''), files: Array.isArray(a && a.files) ? a.files.filter((f) => typeof f === 'string') : [] }));
-  h('answer', (a) => engine.answer(a.id, !!a.allow, !!a.always, a.input));
-  h('interrupt', () => engine.interrupt());
-  h('setModel', (m) => engine.setModel(String(m || '')));
-  h('setPermissionMode', (m) => engine.setPermissionMode(['default', 'acceptEdits', 'plan', 'bypassPermissions', 'auto'].includes(m) ? m : 'default'));
-  h('state', () => engine.state());
-  h('newChat', () => { engine.reset(); push('state', engine.state()); });
-  h('sessions', () => engine.sessions().catch(() => []));
-  h('resume', (id) => engine.resume(String(id)));
+  // the engine calls. The page in this app reaches them over IPC; the phone reaches the allowed ones through the bridge.
+  const calls = {
+    say: (a) => engine.say({ text: String((a && a.text) || ''), files: Array.isArray(a && a.files) ? a.files.filter((f) => typeof f === 'string') : [] }),
+    answer: (a) => { engine.answer(a.id, !!a.allow, !!a.always, a.input); push('permissionDone', { id: a.id }); },
+    interrupt: () => engine.interrupt(),
+    setModel: (m) => engine.setModel(String(m || '')),
+    setPermissionMode: (m) => engine.setPermissionMode(['default', 'acceptEdits', 'plan', 'bypassPermissions', 'auto'].includes(m) ? m : 'default'),
+    state: () => engine.state(),
+    newChat: () => { engine.reset(); push('reset', {}); push('state', engine.state()); },
+    sessions: () => engine.sessions().catch(() => []),
+    resume: async (id) => { const r = await engine.resume(String(id)); push('reset', {}); for (const m of (r && r.messages) || []) push('hist', m); push('state', engine.state()); return {}; },
+    claude: () => setup.claudeStatus(),
+    folders: () => {
+      const fleet = cfg.fleet, parent = path.dirname(fleet), stem = path.basename(fleet) + '-', wt = [];
+      try { for (const d of fs.readdirSync(parent, { withFileTypes: true })) if (d.isDirectory() && d.name.startsWith(stem)) wt.push(path.join(parent, d.name)); } catch { /* none */ }
+      return { current: engine.state().cwd, fleet, worktrees: wt, recent: (cfg.chatRecent || []).filter((p) => fs.existsSync(p)) };
+    },
+    setFolder: async (p) => { p = String(p || ''); if (!fs.existsSync(p) || !fs.statSync(p).isDirectory()) return null; rememberFolder(p); await engine.setCwd(p); push('reset', {}); return p; },
+    context: () => engine.context(),
+    usage: () => engine.usage(),
+    rewind: (a) => engine.rewind(String(a.uuid), !!a.dry),
+    thinking: (n) => engine.setThinking(n === null ? null : Math.max(0, Math.min(63999, Number(n) || 0))),
+    mcpToggle: (a) => engine.toggleMcp(String(a.name), !!a.on),
+    files: (q) => engine.files(q),
+  };
+  for (const k of Object.keys(calls)) h(k, (a) => calls[k](a));
+  bridge = createBridge({ calls, enabled: () => cfg.remoteChat !== false, assetDir: __dirname, fleetDir: () => cfg.fleet });
+  bridge.start();
   h('openDashboard', () => { hideChatView(); open(); });
-  h('context', () => engine.context());
-  h('rewind', (a) => engine.rewind(String(a.uuid), !!a.dry));
-  h('thinking', (n) => engine.setThinking(n === null ? null : Math.max(0, Math.min(63999, Number(n) || 0))));
-  h('mcpToggle', (a) => engine.toggleMcp(String(a.name), !!a.on));
-  h('files', (q) => engine.files(q));
   h('openPath', (p) => { p = String(p || ''); const full = path.isAbsolute(p) ? p : path.join(engine.state().cwd, p); if (fs.existsSync(full)) shell.showItemInFolder(full); });
-  h('usage', () => engine.usage());
-  h('claude', () => setup.claudeStatus());
   h('claudeLogin', () => setup.claudeLogin());
-  h('folders', () => {
-    const fleet = cfg.fleet, parent = path.dirname(fleet), stem = path.basename(fleet) + '-', wt = [];
-    try { for (const d of fs.readdirSync(parent, { withFileTypes: true })) if (d.isDirectory() && d.name.startsWith(stem)) wt.push(path.join(parent, d.name)); } catch { /* none */ }
-    return { current: engine.state().cwd, fleet, worktrees: wt, recent: (cfg.chatRecent || []).filter((p) => fs.existsSync(p)) };
-  });
-  h('setFolder', async (p) => { p = String(p || ''); if (!fs.existsSync(p) || !fs.statSync(p).isDirectory()) return null; rememberFolder(p); await engine.setCwd(p); return p; });
   h('pickFolder', async (_a, e) => { const parent = BrowserWindow.fromWebContents(e.sender) || win; const r = await dialog.showOpenDialog(parent, { title: 'Folder Claude should work in', properties: ['openDirectory'], defaultPath: engine.state().cwd }); if (r.canceled || !r.filePaths[0]) return null; rememberFolder(r.filePaths[0]); await engine.setCwd(r.filePaths[0]); return r.filePaths[0]; });
   h('pickFiles', async (_a, e) => { const parent = BrowserWindow.fromWebContents(e.sender) || win; const r = await dialog.showOpenDialog(parent, { title: 'Attach files or images', properties: ['openFile', 'multiSelections'] }); return r.canceled ? [] : r.filePaths; });
   ipcMain.handle('shell:chatShow', (e, r) => {
@@ -241,7 +253,7 @@ function setupIpc() {
 // ---------- the window ----------
 function createWindow() {
   win = new BrowserWindow({
-    width: 1360, height: 900, minWidth: 420, minHeight: 600, backgroundColor: '#0f0e0b', title: 'Ejad Fleet', autoHideMenuBar: true, show: false,
+    width: 1360, height: 900, minWidth: 420, minHeight: 600, backgroundColor: '#0f0e0b', title: 'Workeve', autoHideMenuBar: true, show: false,
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'shell-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false },
   });
@@ -255,6 +267,7 @@ function createWindow() {
 }
 
 if (!SELFTEST && !app.requestSingleInstanceLock()) app.quit();
+app.on('before-quit', () => { if (bridge) bridge.stop(); });
 app.on('second-instance', open);
 app.on('window-all-closed', () => { /* stays in the tray */ });
 
@@ -270,9 +283,9 @@ app.whenReady().then(async () => {
   const img = nativeImage.createFromPath(path.join(__dirname, 'icon.png'));
   tray = new Tray(img.isEmpty() ? nativeImage.createEmpty() : img);
   tray.on('click', open); tray.on('double-click', open);
-  app.setAppUserModelId('net.ejad.fleet');
+  app.setAppUserModelId('app.workeve');
   setupChat(); setupIpc(); applyLoginItem(); updateTray(); createWindow();
-  if (START_HIDDEN) { const first = setup.checks(cfg); if (!first.ready) toast('Ejad Fleet needs setup', first.claude.loggedIn ? 'A required tool is missing. Open Ejad Fleet to finish.' : 'Sign in to Claude to use the chat and planner.', open); }
+  if (START_HIDDEN) { const first = setup.checks(cfg); if (!first.ready) toast('Workeve needs setup', first.claude.loggedIn ? 'A required tool is missing. Open Workeve to finish.' : 'Sign in to Claude to use the chat and planner.', open); }
   if (process.argv.includes('--chat')) openChat();
   setInterval(poll, 15000);
 });

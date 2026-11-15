@@ -1,15 +1,15 @@
-# Ejad Fleet (Windows app)
+# Workeve (Windows app)
 
 A tray app that starts with Windows, keeps the fleet dashboard, router loop and tunnel running, and shows the dashboard in its own window.
 
 ## Run it
 - Build: `npm install`, unzip Electron once if its installer fails (see below), then `npm run pack`.
-- Output: `dist/Ejad Fleet-win32-x64/Ejad Fleet.exe` (run it; a gold `{ }` icon appears in the tray).
-- Test without a window: `Ejad Fleet.exe --selftest` writes `%APPDATA%\EjadFleet\selftest.json`.
+- Output: `dist/Workeve-win32-x64/Workeve.exe` (run it; a gold `{ }` icon appears in the tray).
+- Test without a window: `Workeve.exe --selftest` writes `%APPDATA%\Workeve\selftest.json`.
 - Start hidden in the tray: `--hidden` (what the Windows startup entry uses).
 
 ## Notes
-- Config: `%APPDATA%\EjadFleet\config.json` (`fleet` = the fleet folder, `autostart`). Log: `%APPDATA%\EjadFleet\launcher.log`.
+- Config: `%APPDATA%\Workeve\config.json` (`fleet` = the fleet folder, `autostart`). Log: `%APPDATA%\Workeve\launcher.log`.
 - It starts the fleet with the fleet's own `start-dashboard.sh`, so it reuses a healthy server instead of starting a second one.
 - The window loads only `127.0.0.1`. The dashboard token is read by the app and never given to the page.
 - Quit leaves the fleet running. Set `EJAD_NO_AUTOSTART=1` to launch without registering startup.
@@ -33,8 +33,23 @@ A tray app that starts with Windows, keeps the fleet dashboard, router loop and 
 - **Notifications**: provider problem, stuck router, a ticket that stopped building, a model switch waiting for you, Claude
   waiting for permission or finished (only when the window is not in front). The installer gives the app its own Windows identity
   so they are reliable. "Test notification" is in Setup.
-- **Installer**: `npm run dist` builds `dist-installer/Ejad Fleet Setup <version>.exe` (NSIS, per user, no admin). It appears in
+- **Installer**: `npm run dist` builds `dist-installer/Workeve Setup <version>.exe` (NSIS, per user, no admin). It appears in
   Settings > Apps (uninstall there) and in Start. Start with Windows is the tray toggle and also shows in Settings > Apps > Startup.
-  Silent install/uninstall for testing: `Setup.exe /S /D=<folder>` and `Uninstall Ejad Fleet.exe /currentuser /S`.
+  Silent install/uninstall for testing: `Setup.exe /S /D=<folder>` and `Uninstall Workeve.exe /currentuser /S`.
 - **Mockups**: `mockup/build-mockups.py` regenerates the three theme mockups and `chat.css`/`chat.html` from `mockup/chat-base.html`,
   `chat.template.html` and `chat-extra.css`. Edit those, not the generated files.
+
+## Workeve: phone chat and timeline logs
+
+- **Name and logo**: the app is Workeve. The gold braces icon is the logo (installer, taskbar, start screen, chat header).
+  Settings moved from `%APPDATA%\EjadFleet` to `%APPDATA%\Workeve` (copied automatically on first start).
+- **Chat from the phone link**: the full-access dashboard link shows a Chat tab when this app is running. The page is the same
+  chat, served by the dashboard server (`/chat/`), and the conversation is shared with the desktop one. How it is kept safe:
+  the app listens on 127.0.0.1 only (secret in `job/chat-bridge.json`); the server allows it only for the full-access token from
+  another device (never the read-only link, never this computer); a short list of actions; no "Allow all" from the phone; no
+  folder dialogs (folders come from a list); the audit log keeps the action name, never your prompt. Tray: "Chat from the phone
+  link" turns it off. With the app closed there is no chat.
+- **Timeline logs**: a ticket's Logs tab and the Router panel show the agents' work like the chat does (Timeline, default) or as
+  plain text (Text). Per agent: formatted messages, folded thinking, one row per tool (command with output, diffs for edits,
+  reads, searches), the plan as a checklist. Patches: `ejad-agent-steps.cjs` (server, `/api/ejad/steps`) and
+  `ejad-dashboard-steps.cjs` (page; it inlines `app/chat-md.js`).
