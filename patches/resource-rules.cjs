@@ -19,7 +19,7 @@ const BLOCK = `${MARK}
 ${MARK.replace('<!--', '<!--/')}
 
 `;
-const NAMES = ['worker', 'implementer', 'tester', 'merger', 'checker', 'teammate', 'reproducer'];
+const NAMES = ['router', 'orchestrator', 'worker', 'implementer', 'tester', 'merger', 'checker', 'teammate', 'reproducer', 'reviewer', 'planner', 'watchdog'];
 let n = 0;
 for (const dir of ['.claude/agents', '.opencode/agents']) {
   for (const name of NAMES) {
