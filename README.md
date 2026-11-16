@@ -130,3 +130,10 @@ The installer adds three guards so a small machine is not run out of memory:
   npm in a pnpm project) and to run heavy commands through `heavy-run.sh`.
 - `heavy-run.sh <command...>`: a machine-wide lock, so only one install, test, build or lint runs at a time across all
   fleets on the computer. A lock whose owner has died is taken over.
+
+### Turning remote access on and off
+
+`bash .claude/scripts/tunnel.sh off | on | status` (run in the fleet folder) is the one switch for the Cloudflare tunnel.
+`off` sets `dashboard.tunnel.provider` to `local` and stops every connector for the dashboard's port, so nothing is
+exposed; `on` sets it back to `cloudflared` (a configured named tunnel and hostname are kept) and starts the tunnel.
+While the provider is `local`, neither the app nor `start-dashboard.sh` opens a tunnel.
