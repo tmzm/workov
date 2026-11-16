@@ -20,7 +20,8 @@ PYHUB
 )"
 HUB="$(printf '%s' "$HUB" | tr -d '\r')"
 lower() { printf '%s' "$1" | tr 'A-Z' 'a-z'; }
-SAME="$(python3 -I -c "import os,sys;print(int(os.path.exists(sys.argv[1]) and os.path.samefile(sys.argv[1], sys.argv[2])))" "$HUB" "$HERE" 2>/dev/null | tr -d '')"
+SAME="$(python3 -I -c "import os,sys;print(int(os.path.exists(sys.argv[1]) and os.path.samefile(sys.argv[1], sys.argv[2])))" "$HUB" "$HERE" 2>/dev/null | tr -d '
+')"
 if [ -n "$HUB" ] && [ "$SAME" = "0" ] && [ -d "$HUB/job" ]; then
   echo "the one router runs from $HUB; nothing to do here"
   exit 0
@@ -45,7 +46,7 @@ busy_note() {
   return 0
 }
 latest_router_session() {
-  python3 -I - "$PWD" <<'PY'
+  python3 -I - "$(cygpath -m "$NEUTRAL" 2>/dev/null || echo "$NEUTRAL")" <<'PY'
 import os, sqlite3, sys
 db = os.environ.get("OPENCODE_DB") or os.path.join(os.path.expanduser("~"), ".local", "share", "opencode", "opencode.db")
 root = sys.argv[1].replace("\\", "/").rstrip("/").lower()
@@ -58,6 +59,17 @@ except Exception:
     pass
 PY
 }
+# The router runs from a neutral folder that belongs to no project, so a relative path it writes by mistake can never touch a
+# project's files (it lands here, harmlessly). Its agent files and model settings are copied from this hub every cycle.
+NEUTRAL="${WV_ROUTER_HOME:-$HOME/Workerov/router}"
+mkdir -p "$NEUTRAL/.opencode" "$NEUTRAL/job"
+[ -d "$NEUTRAL/.git" ] || git -C "$NEUTRAL" init -q 2>/dev/null
+sync_router() {
+  rm -rf "$NEUTRAL/.opencode/agents" && cp -r "$HERE/.opencode/agents" "$NEUTRAL/.opencode/agents" 2>/dev/null
+  cp "$HERE/opencode.json" "$NEUTRAL/opencode.json" 2>/dev/null
+  return 0
+}
+oc() { ( cd "$NEUTRAL" && opencode "$@" ); }
 SID="${WV_ROUTER_SESSION:-}"
 FIRST="Run the fleet for this project. Reconcile job/router-state.json first: a worker listed there may still be alive inside OpenCode (check its job/status.json heartbeat and its session) before you re-dispatch it. Dispatch every ready ticket, verify finished ones against eval.md, and land them per their Landing mode. Do one full cycle, then end your turn; you will be called again."
 NEXT="Next router cycle for this project: reconcile, read worker heartbeats and results, dispatch ready tickets, verify and land finished ones, answer or record pending decisions. Then end your turn."
@@ -73,11 +85,13 @@ while true; do
   CTX="PROJECT $NAME, HOME $ROOT. This cycle is only about this project. Every path in your instructions that starts with job/, specs/, .claude/ or .opencode/ means that path under HOME (use the absolute path), and every git or script command must start with: cd \"$ROOT\" && . Do not touch any other project."
   echo "[router-loop] cycle for $NAME"
   if [ -z "$SID" ]; then
-    opencode run --auto --agent router "$CTX $FIRST$(busy_note "$ROOT")"
+    sync_router
+    oc run --auto --agent router "$CTX $FIRST$(busy_note "$ROOT")"
     SID="$(latest_router_session | tr -d '\r')"
     echo "[router-loop] router session: ${SID:-unknown}"
   else
-    opencode run --auto --agent router --session "$SID" "$CTX $NEXT$(busy_note "$ROOT")"
+    sync_router
+    oc run --auto --agent router --session "$SID" "$CTX $NEXT$(busy_note "$ROOT")"
   fi
   sleep "$INTERVAL"
 done

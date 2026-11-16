@@ -1,6 +1,6 @@
 // Workerov: one router for every project. The router's instructions are written for one repository (relative paths such as
 // job/ and specs/). Each cycle's message now names a PROJECT and its HOME folder; this block tells the router to read every
-// such path under HOME. The permission plugin enforces it (.opencode/wv/router-scope.mjs). Idempotent.
+// such path under HOME. The loop runs the router from a neutral folder, so a wrong relative path cannot touch a project. Idempotent.
 const fs = require('fs');
 const path = require('path');
 const MARK = '<!-- wv-router-projects -->';
@@ -14,7 +14,7 @@ the hub, not the project. Each cycle message starts with \`PROJECT <name>, HOME 
   Read and write it by absolute path (\`HOME/job/router-state.json\`), never by a relative one.
 - Start every shell command with \`cd "HOME" && \`, including \`git\`, \`node .claude/scripts/...\` and \`bash .claude/scripts/...\`.
 - Work on that project only. Never read the state of another project to decide anything, and never write outside HOME; the
-  permission plugin denies it. If a call is denied because a path was relative, repeat it with HOME.
+  a relative path would land in your own empty working folder, not in the project, so the project would not change. Always use HOME.
 - Keep the ledger per project: \`HOME/job/router-state.json\` and \`HOME/specs/tickets/BOARD.md\` are that project's. Do not carry
   tickets, ports or worker ids from one cycle's project into the next.`;
 let n = 0;
