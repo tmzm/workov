@@ -73,6 +73,9 @@ def wv_projects():
                 turn = (r.stdout or "").strip()
         except Exception:
             turn = ""
+        cur = wv_router_project()
+        if cur and wv_norm_root(cur.get("root", "")) == wv_norm_root(root):
+            turn = "the router is working on this project now"
         projects.append({
             "router": turn,
             "name": f["name"], "root": root, "port": port, "online": wv_port_open(port),
@@ -82,45 +85,22 @@ def wv_projects():
     return {"projects": projects, "workerActive": [p["name"] for p in projects if p["runningCount"]]}
 
 
-_WV_OTHER_STARTED = {}
+def wv_wanted():
+    """The one router serves every project: it is wanted when any registered project needs it (wv-turn.py --pick)."""
+    try:
+        r = subprocess.run([sys.executable, "-I", str(Path.home() / ".wv-bin" / "wv-turn.py"), "--pick", "--peek"],
+                           capture_output=True, text=True, timeout=20)
+        return r.returncode == 0
+    except Exception:
+        return False
 
 
-def wv_start_other_fleets():
-    """Start the router loop of every other registered project that has work, so this one dashboard drives them all.
-    router-loop.sh exits at once when a loop is already running, and each project is tried at most every 5 minutes."""
-    for f in wv_fleets():
-        root = f["root"]
-        if wv_norm_root(root) == wv_norm_root(REPO_ROOT):
-            continue
-        base = Path(root)
-        if (base / "job" / "fleet-off").exists() or not (base / ".claude" / "scripts" / "router-loop.sh").exists():
-            continue
-        if time.time() - _WV_OTHER_STARTED.get(root, 0) < 300:
-            continue
-        try:
-            text = (base / "specs" / "tickets" / "BOARD.md").read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if not re.search(r"^\|\s*\d{3}\s*\|[^|]*\|\s*(ready|in-progress|specifying)\s*\|", text, re.M):
-            continue
-        _WV_OTHER_STARTED[root] = time.time()
-        (base / "job").mkdir(exist_ok=True)
-        log = open(base / "job" / "router-loop.log", "ab")
-        subprocess.Popen([wv_git_bash(), ".claude/scripts/router-loop.sh"], cwd=str(base), stdin=subprocess.DEVNULL,
-                         stdout=log, stderr=log, creationflags=WV_DETACH if os.name == "nt" else 0, start_new_session=(os.name != "nt"))
-        print(f"[wv] router loop of {f['name']} started by this dashboard", file=sys.stderr)
-
-
-def wv_autostart_others():
-    time.sleep(40)
-    while True:
-        try:
-            wv_start_other_fleets()
-        except Exception as e:
-            print(f"[wv] starting the other projects failed: {e}", file=sys.stderr)
-        time.sleep(30)
-
-
-threading.Thread(target=wv_autostart_others, daemon=True).start()
+def wv_router_project():
+    """The project the one router is working on right now (the permission plugin's guard file), or None."""
+    try:
+        d = json.loads((Path.home() / ".workerov" / "router-project.json").read_text(encoding="utf-8"))
+        return d if d.get("name") else None
+    except Exception:
+        return None
 
 

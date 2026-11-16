@@ -1,45 +1,46 @@
 #!/usr/bin/env bash
-# wv-fleet: keep the OpenCode router working without a terminal. `opencode run --agent router` ends when the router
-# finishes one cycle, and its wake watcher can't wake an OpenCode run on Windows. This loop starts the next cycle in
-# the same router session every WV_ROUTER_INTERVAL seconds (default 90) while any ticket is specifying, ready or
-# in-progress, then exits. One loop per repo (job/router-loop.pid). Usage: bash .claude/scripts/router-loop.sh
+# Workerov: THE router. One loop and one OpenCode router session serve every project registered in ~/.workerov/fleets.json,
+# one project per cycle. `opencode run --agent router` ends when the router finishes one cycle and cannot be woken on Windows,
+# so this loop starts the next cycle every WV_ROUTER_INTERVAL seconds (default 90) for as long as any project needs the
+# router, then exits. wv-turn.py --pick chooses the project (fair turns, one worker at a time on the computer) and the cycle
+# message names it. The permission plugin (.opencode/wv/router-scope.mjs) keeps the router inside that project's folder.
+# It runs from the hub only (the folder whose dashboard serves the board); another project's folder does nothing.
+# Usage: bash .claude/scripts/router-loop.sh
 set -u
 cd "$(git rev-parse --show-toplevel)" || exit 2
+HOME_DIR="$HOME/.workerov"
+HERE="$(cygpath -m "$(pwd)" 2>/dev/null || pwd)"
+HUB="$(python3 -I - "$HOME_DIR/hub.json" <<'PYHUB'
+import json, sys
+try:
+    print(str(json.load(open(sys.argv[1], encoding="utf-8")).get("root", "")).replace(chr(92), "/").rstrip("/"))
+except Exception:
+    pass
+PYHUB
+)"
+HUB="$(printf '%s' "$HUB" | tr -d '\r')"
+lower() { printf '%s' "$1" | tr 'A-Z' 'a-z'; }
+SAME="$(python3 -I -c "import os,sys;print(int(os.path.exists(sys.argv[1]) and os.path.samefile(sys.argv[1], sys.argv[2])))" "$HUB" "$HERE" 2>/dev/null | tr -d '')"
+if [ -n "$HUB" ] && [ "$SAME" = "0" ] && [ -d "$HUB/job" ]; then
+  echo "the one router runs from $HUB; nothing to do here"
+  exit 0
+fi
 mkdir -p job
 PIDFILE=job/router-loop.pid
 if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then echo "router loop already running (pid $(cat "$PIDFILE"))"; exit 0; fi
 echo $$ > "$PIDFILE"
-trap 'rm -f "$PIDFILE"' EXIT
+trap 'rm -f "$PIDFILE" "$HOME_DIR/router-project.json"' EXIT
 INTERVAL="${WV_ROUTER_INTERVAL:-90}"
 export WV_APPROVALS="${WV_APPROVALS:-auto}"
-# wv-fleet: heavy pnpm/npm commands (test, lint, build, install) wait their turn machine-wide
+# heavy pnpm/npm commands (test, lint, build, install) wait their turn machine-wide
 export PATH="$HOME/.wv-bin:$PATH"
 # bash agents call the real pnpm/ng directly; this makes them go through the same lock
 export BASH_ENV="$HOME/.wv-bin/wv-bashenv.sh"
-working() { grep -E '^\| [0-9]{3} ' specs/tickets/BOARD.md | grep -q -E '\| (specifying|ready|in-progress) *\|'; }
-# A blocked ticket whose answer is saved (user-decision.md) but not yet forwarded still needs a router cycle: the router
-# is the one that hands the answer to the waiting worker. Without this the loop stops and the answer is never delivered.
-answered() {
-  for f in specs/tickets/*/user-decision.md; do
-    [ -f "$f" ] || continue
-    d="$(basename "$(dirname "$f")")"
-    grep -E '"pendingDecisions"' job/router-state.json 2>/dev/null | grep -q "\"$d\"" && return 0
-  done
-  return 1
-}
-active() { working || answered; }
-# One worker at a time across every project on this machine: when another registered fleet (~/.workerov/fleets.json)
-# has a live worker, this cycle may reconcile and answer decisions but must not start a worker.
-# One router for every project: only the project whose turn it is makes a router model call (wv-turn.py decides: a project with
-# a live worker, an in-progress ticket or an answered decision is always watched; a ready one starts only when no worker runs
-# anywhere, in fair turns). The others just sleep, which costs nothing.
-not_my_turn() {
-  TURN_WHY="$(python3 -I "$HOME/.wv-bin/wv-turn.py" "$PWD" 2>/dev/null | tr -d '\r')"
-  [ "$TURN_WHY" != "run" ]
-}
+
+# one worker at a time across every project: tell the router when another project's worker is running
 busy_note() {
   local b
-  b="$(python3 -I "$HOME/.wv-bin/wv-busy.py" "$PWD" 2>/dev/null | tr -d '\r')"
+  b="$(python3 -I "$HOME/.wv-bin/wv-busy.py" "$1" 2>/dev/null | tr -d '\r')"
   [ -n "$b" ] && printf ' DISPATCH PAUSED: this computer runs one worker at a time and %s has a worker running. Do not start any worker this cycle (no new dispatch, no new worktree); keep reconciling and answering decisions, and say in your one summary line that dispatch is waiting for %s.' "$b" "$b"
   return 0
 }
@@ -58,22 +59,26 @@ except Exception:
 PY
 }
 SID="${WV_ROUTER_SESSION:-}"
-FIRST="Run the fleet. Reconcile job/router-state.json first: a worker listed there may still be alive inside OpenCode (check its job/status.json heartbeat and its session) before you re-dispatch it. Dispatch every ready ticket, verify finished ones against eval.md, and land them per their Landing mode. Do one full cycle, then end your turn; you will be called again."
-NEXT="Next router cycle: reconcile, read worker heartbeats and results, dispatch ready tickets, verify and land finished ones, answer or record pending decisions. Then end your turn."
-while active; do
-  if not_my_turn; then
-    echo "[router-loop] ${TURN_WHY:-no router cycle now}: no router call"
-    sleep "$INTERVAL"
-    continue
-  fi
+FIRST="Run the fleet for this project. Reconcile job/router-state.json first: a worker listed there may still be alive inside OpenCode (check its job/status.json heartbeat and its session) before you re-dispatch it. Dispatch every ready ticket, verify finished ones against eval.md, and land them per their Landing mode. Do one full cycle, then end your turn; you will be called again."
+NEXT="Next router cycle for this project: reconcile, read worker heartbeats and results, dispatch ready tickets, verify and land finished ones, answer or record pending decisions. Then end your turn."
+while true; do
+  PICK="$(python3 -I "$HOME/.wv-bin/wv-turn.py" --pick | tr -d '\r')"
+  case "$PICK" in
+    run*) ;;
+    *) echo "[router-loop] ${PICK:-no project needs the router}: stopping"; break ;;
+  esac
+  NAME="$(printf '%s' "$PICK" | cut -f2)"
+  ROOT="$(printf '%s' "$PICK" | cut -f3)"
+  printf '{"name": "%s", "root": "%s", "at": "%s"}\n' "$NAME" "$ROOT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HOME_DIR/router-project.json"
+  CTX="PROJECT $NAME, HOME $ROOT. This cycle is only about this project. Every path in your instructions that starts with job/, specs/, .claude/ or .opencode/ means that path under HOME (use the absolute path), and every git or script command must start with: cd \"$ROOT\" && . Do not touch any other project."
+  echo "[router-loop] cycle for $NAME"
   if [ -z "$SID" ]; then
-    opencode run --auto --agent router "$FIRST$(busy_note)"
+    opencode run --auto --agent router "$CTX $FIRST$(busy_note "$ROOT")"
     SID="$(latest_router_session | tr -d '\r')"
     echo "[router-loop] router session: ${SID:-unknown}"
   else
-    opencode run --auto --agent router --session "$SID" "$NEXT$(busy_note)"
+    opencode run --auto --agent router --session "$SID" "$CTX $NEXT$(busy_note "$ROOT")"
   fi
-  active || break
   sleep "$INTERVAL"
 done
-echo "[router-loop] no ticket is specifying, ready, in-progress or waiting for its answer to be forwarded: stopping"
+echo "[router-loop] no project is specifying, ready, in progress or waiting for its answer to be forwarded: stopping"

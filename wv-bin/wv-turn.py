@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""wv-turn.py <this-fleet-root> [--peek]
+"""wv-turn.py --pick [--peek]          which project the one router works on now
+wv-turn.py <this-fleet-root> [--peek]  does this project's turn come now (the dashboard's per-project view)
 
-The one router: every registered project (~/.workerov/fleets.json) has its own router loop, but only the project whose turn
-it is makes a router model call. Prints "run" and exits 0 when this project's loop should run a cycle now, otherwise prints
+The one router: a single router session serves every registered project (~/.workerov/fleets.json), one project per cycle.
+--pick prints "run<TAB>name<TAB>root" for the project that has the turn, or why nothing runs (exit 1). Prints "run" and exits 0 when this project's loop should run a cycle now, otherwise prints
 why it waits and exits 1 (the loop then just sleeps, which costs nothing).
 
   1. A project that must be watched always runs: it has a live worker, a ticket in progress, or an answered decision that
@@ -58,13 +59,44 @@ def info(root):
     return {
         "off": (base / "job" / "fleet-off").exists(),
         "live": live_workers(root),
-        "progress": "in-progress" in status,
+        "progress": "in-progress" in status or "specifying" in status,
         "ready": "ready" in status,
         "answered": answered,
     }
 
 
+def pick(peek):
+    fleets = read_json(Path.home() / ".workerov" / "fleets.json")
+    fleets = fleets if isinstance(fleets, list) else []
+    items = [(str(f.get("name", "")), str(f.get("root", ""))) for f in fleets if isinstance(f, dict) and f.get("root")]
+    infos = {r: info(r) for _, r in items}
+    on = [(n, r) for n, r in items if not infos[r]["off"]]
+    if not on:
+        print("every project is switched off")
+        return 1
+    any_live = any(infos[r]["live"] for _, r in on)
+    watched = [(n, r) for n, r in on if infos[r]["live"] or infos[r]["progress"] or infos[r]["answered"]]
+    ready = [] if any_live else [(n, r) for n, r in on if infos[r]["ready"] and (n, r) not in watched]
+    cand = watched + ready
+    if not cand:
+        print("nothing ready or running")
+        return 1
+    last = read_json(TURN_FILE)
+    n, r = min(cand, key=lambda x: (last.get(norm(x[1]), 0), norm(x[1])))
+    if not peek:
+        last[norm(r)] = time.time()
+        try:
+            TURN_FILE.parent.mkdir(parents=True, exist_ok=True)
+            TURN_FILE.write_text(json.dumps(last), encoding="utf-8")
+        except OSError:
+            pass
+    print("run	" + n + "	" + r.replace("\\", "/"))
+    return 0
+
+
 def main():
+    if "--pick" in sys.argv:
+        return pick("--peek" in sys.argv)
     args = [a for a in sys.argv[1:] if a != "--peek"]
     peek = "--peek" in sys.argv
     me = args[0] if args else ""

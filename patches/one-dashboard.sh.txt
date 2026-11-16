@@ -2,11 +2,16 @@
 # ~/.workerov/hub.json and is listening), this folder does not start its own. Its tickets are on that dashboard's board.
 if [ -f "$HOME/.workerov/hub.json" ] && ! printf " %s " "$*" | grep -qE " (--stop|--help|-h) "; then
   HUB_MSG="$(python3 -I - "$REPO_ROOT" "$HOME/.workerov/hub.json" <<'PYHUB'
-import json, socket, sys
-root = sys.argv[1].replace(chr(92), "/").rstrip("/").lower()
+import json, re, socket, sys
+root = sys.argv[1]
+if re.match(r"^/[a-zA-Z]/", root):
+    root = root[1] + ":" + root[2:]
+root = root.replace(chr(92), "/").rstrip("/").lower()
 try:
     d = json.load(open(sys.argv[2], encoding="utf-8"))
-    if str(d.get("root", "")).replace(chr(92), "/").rstrip("/").lower() != root:
+    import os
+    hub = str(d.get("root", ""))
+    if not (os.path.exists(hub) and os.path.exists(sys.argv[1]) and os.path.samefile(hub, sys.argv[1])):
         with socket.create_connection(("127.0.0.1", int(d["port"])), 0.5):
             print("The one dashboard for every project is already running at http://127.0.0.1:%s/ ; this project does not start its own." % d["port"])
 except Exception:

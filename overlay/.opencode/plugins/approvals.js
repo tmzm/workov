@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
+import { routerScopeDenial } from '../wv/router-scope.mjs';
 
 let define = (x) => x;
 try {
@@ -89,6 +90,8 @@ export default define({
     const mode = process.env.WV_APPROVALS || (fs.existsSync(path.join(root, 'specs', 'worker-fleet.config.json')) ? '1' : '');
     if (!mode) return;
     await ctx.permission.hook('evaluate', async (event) => {
+      const scope = routerScopeDenial(event);
+      if (scope) { event.effect = 'deny'; event.message = scope; return; }
       const verdict = policy(String(event.action || ''), (event.resources || []).map(String));
       if (verdict === 'ask' && mode === 'auto') { event.effect = 'allow'; return; }
       if (verdict !== 'ask') {
