@@ -137,3 +137,7 @@ The installer adds three guards so a small machine is not run out of memory:
 `off` sets `dashboard.tunnel.provider` to `local` and stops every connector for the dashboard's port, so nothing is
 exposed; `on` sets it back to `cloudflared` (a configured named tunnel and hostname are kept) and starts the tunnel.
 While the provider is `local`, neither the app nor `start-dashboard.sh` opens a tunnel.
+
+`overlay/wv-bin/` holds `pnpm` and `npm` wrappers, installed to `~/.wv-bin` and put first on `PATH` by `router-loop.sh`. A
+heavy subcommand (`install`, `test`, `lint`, `build`, `format`, `e2e`) goes through `heavy-run.sh`, so only one runs at a
+time on the machine even when an agent forgets the rule. Other commands pass straight through to the real tool.

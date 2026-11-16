@@ -17,4 +17,5 @@ until mkdir "$LOCK" 2>/dev/null; do
 done
 echo "$$" > "$LOCK/pid"
 trap 'rm -rf "$LOCK"' EXIT INT TERM
+export WV_HEAVY_HELD=1
 "$@"
