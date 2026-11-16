@@ -14,6 +14,8 @@ INTERVAL="${WV_ROUTER_INTERVAL:-90}"
 export WV_APPROVALS="${WV_APPROVALS:-auto}"
 # wv-fleet: heavy pnpm/npm commands (test, lint, build, install) wait their turn machine-wide
 export PATH="$HOME/.wv-bin:$PATH"
+# bash agents call the real pnpm/ng directly; this makes them go through the same lock
+export BASH_ENV="$HOME/.wv-bin/wv-bashenv.sh"
 working() { grep -E '^\| [0-9]{3} ' specs/tickets/BOARD.md | grep -q -E '\| (specifying|ready|in-progress) *\|'; }
 # A blocked ticket whose answer is saved (user-decision.md) but not yet forwarded still needs a router cycle: the router
 # is the one that hands the answer to the waiting worker. Without this the loop stops and the answer is never delivered.
