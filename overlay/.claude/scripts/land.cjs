@@ -13,7 +13,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-// Per-person settings: ~/.claude/task ejad.json (see profile.example.json in ejad-fleet).
+// Per-person settings: ~/.claude/ejadtask.json (see profile.example.json in ejad-fleet).
 const PROFILE = (() => {
   const file = process.env.EJADTASK_PROFILE || path.join(require('node:os').homedir(), '.claude', 'ejadtask.json');
   if (!fs.existsSync(file)) throw new Error(`missing ${file}: copy profile.example.json from wv-fleet and fill it in`);

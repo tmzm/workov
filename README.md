@@ -43,11 +43,11 @@ The installer:
 2. sets the models (OpenCode Go: router `glm-5.3`, workers `kimi-k2.7-code`, reviewer `deepseek-v4-pro`, the rest
    `glm-5.3-flash`), GitLab landing, 2 workers, app port 4200, $3 per ticket;
 3. adds the Workerov layer and keeps every installed file out of git (`.git/info/exclude`, local only);
-4. copies `/task ejad` to `~/.claude/commands/` and creates `~/.claude/task ejad.json` from
+4. copies `/task ejad` to `~/.claude/commands/` and creates `~/.claude/ejadtask.json` from
    `profile.example.json` if you have none.
 
 Then, once per person:
-- fill in `~/.claude/task ejad.json` (your Plane, GitLab and Ejad HR ids, and your reviewers with an optional
+- fill in `~/.claude/ejadtask.json` (your Plane, GitLab and Ejad HR ids, and your reviewers with an optional
   `until` date);
 - set the Windows user environment variables `HR_EMAIL`, `HR_PASS` (Ejad HR) and `PLANE_API_KEY` (Plane → Profile
   settings → API tokens). They are read from the environment only and never written anywhere;
@@ -99,7 +99,7 @@ pack in `.delivery/HR-484/`. Then:
 | `specs/worker-fleet.config.json` | models per role, parallel workers, ports, budgets (re-run `python3 .claude/scripts/apply-setup.py --preset custom` after editing) |
 | `.claude/scripts/implementers.json` | command lines of the implementer CLIs (`{prompt}` is replaced) |
 | `.opencode/plugins/approvals.js` | the permission policy (`ALLOW_SHELL`, `DENY_SHELL`) |
-| `~/.claude/task ejad.json` | your ids and reviewers |
+| `~/.claude/ejadtask.json` | your ids and reviewers |
 | phone pushes | `python3 .claude/scripts/apply-setup.py --notify-ntfy <your-secret-topic>` and the ntfy app |
 
 Copilot is limited to the tools listed in `implementers.json`. Kilo and Antigravity have no blanket auto-approve

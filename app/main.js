@@ -134,6 +134,9 @@ async function poll() {
   else if (r.json.state === 'stuck') notify('stuck', 'Router looks stuck', 'Open the dashboard to restart it (the watchdog restarts it after 12 minutes).');
   else lastNotified = '';
   updateTray();
+  // the dashboard may have moved to another port since this window loaded (a restart can pick the next free one):
+  // follow it instead of staying on an address that no longer answers
+  try { const cur = win && win.webContents.getURL(); if (cur && /^http:\/\/127\.0\.0\.1:\d+\//.test(cur) && new URL(cur).port !== String(port())) win.loadURL(dashboardUrl()); } catch { /* window is closing */ }
   return true;
 }
 let hiddenAt = 0;

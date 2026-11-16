@@ -77,7 +77,7 @@ From the repository you are running in:
 
 ## Fixed facts (all projects)
 
-- **Me and my reviewer:** read `~/.claude/task ejad.json` (fields `planeUserId`, `gitlabUserId`,
+- **Me and my reviewer:** read `~/.claude/ejadtask.json` (fields `planeUserId`, `gitlabUserId`,
   `ejadHrEmployeeId`, `reviewers` = `[{ "name", "gitlabUserId", "until": "YYYY-MM-DD" | null }]`, optional
   `planeBaseUrl`, `planeWorkspace`, `ejadHrApi`). The reviewer is the first entry whose `until` is today or later (or
   has none), unless the input says otherwise. If the file is missing, ask me for the values and create it.
