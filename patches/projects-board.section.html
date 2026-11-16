@@ -23,8 +23,7 @@
           function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
           function token() { try { return localStorage.getItem('worker_fleet_token') || ''; } catch (e) { return ''; } }
           function link(p, t) {
-            if (p.self) return '#ticket/' + t.id;
-            return location.protocol + '//' + location.hostname + ':' + p.port + '/#ticket/' + t.id;
+            return p.self ? '#ticket/' + t.id : '#';
           }
           function render(d) {
             box.textContent = '';
@@ -39,12 +38,6 @@
               head.append(el('strong', '', p.name));
               head.append(el('span', 'note-s', p.tickets.length + (p.tickets.length === 1 ? ' ticket' : ' tickets')));
               if (p.off) head.append(el('span', 'badge', 'fleet off'));
-              if (!p.self) {
-                var a = el('a', '', p.online ? 'Open its dashboard' : 'its dashboard is off');
-                if (p.online) { a.href = location.protocol + '//' + location.hostname + ':' + p.port + '/'; a.target = '_blank'; a.rel = 'noopener'; }
-                a.style.marginLeft = 'auto';
-                head.append(a);
-              }
               card.append(head);
               var rows = p.tickets.slice().sort(function (x, y) { return ORDER.indexOf(x.status) - ORDER.indexOf(y.status) || x.id.localeCompare(y.id); });
               if (!rows.length) card.append(el('div', 'note-s', 'No tickets yet.'));
@@ -52,7 +45,7 @@
                 var r = el('div', '', '');
                 r.style.cssText = 'display:grid;grid-template-columns:3.2em 1fr auto auto;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line, #8883)';
                 r.append(el('span', 'note-s', t.id));
-                var a2 = el('a', '', t.title); a2.style.color = 'inherit'; a2.href = link(p, t); if (!p.self) { a2.target = '_blank'; a2.rel = 'noopener'; }
+                var a2 = el('a', '', t.title); a2.style.color = 'inherit'; a2.href = link(p, t); if (!p.self) a2.addEventListener('click', function (ev) { ev.preventDefault(); window.wvOpenForeign(p.name, t.id); });
                 r.append(a2);
                 var st = el('span', 'badge' + (t.status === 'blocked' || t.status === 'failed' ? ' badge-accent' : ''), (LABEL[t.status] || t.status) + (t.running ? ' · worker running' : ''));
                 r.append(st);

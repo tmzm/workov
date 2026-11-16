@@ -333,7 +333,7 @@ function openProcesses() {
 // ---------- the window ----------
 function createWindow() {
   win = new BrowserWindow({
-    width: 1360, height: 900, minWidth: 420, minHeight: 600, backgroundColor: '#0f0e0b', autoHideMenuBar: true, show: false,
+    ...savedBounds(), minWidth: 420, minHeight: 600, backgroundColor: '#0f0e0b', autoHideMenuBar: true, show: false,
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'shell-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false },
   });
@@ -343,7 +343,31 @@ function createWindow() {
   win.on('close', (e) => { if (!quitting) { e.preventDefault(); win.hide(); hiddenAt = Date.now(); } });
   win.on('closed', () => { win = null; chatViewShown = false; });
   win.loadFile(path.join(__dirname, 'start.html'), { query: { name: APP_NAME } });
-  win.once('ready-to-show', () => { if (!START_HIDDEN) win.show(); });
+  win.once('ready-to-show', () => { if (cfg.window ? cfg.window.maximized : true) win.maximize(); if (!START_HIDDEN) win.show(); });
+  let saveTimer = null;
+  const remember = () => { clearTimeout(saveTimer); saveTimer = setTimeout(saveWindow, 400); };
+  for (const ev of ['resize', 'move', 'maximize', 'unmaximize']) win.on(ev, remember);
+  win.on('close', saveWindow);
+}
+
+// ---------- window position and size: opens maximized the first time, then where and how big it was left ----------
+const isRect = (r) => !!r && [r.x, r.y, r.width, r.height].every((n) => Number.isFinite(n)) && r.width >= 420 && r.height >= 600;
+function savedBounds() {
+  const w = cfg.window;
+  if (isRect(w)) {
+    // only reuse a spot that is still visible on a connected screen (a monitor may have been unplugged)
+    const { screen } = require('electron');
+    const visible = screen.getAllDisplays().some((d) => { const a = d.workArea; return w.x < a.x + a.width - 80 && w.x + w.width > a.x + 80 && w.y >= a.y - 20 && w.y < a.y + a.height - 80; });
+    if (visible) return { x: w.x, y: w.y, width: w.width, height: w.height };
+  }
+  return { width: 1360, height: 900 };
+}
+function saveWindow() {
+  if (!win || win.isDestroyed() || win.isMinimized()) return;
+  const r = win.getNormalBounds();
+  if (!isRect(r)) return;
+  cfg.window = { x: r.x, y: r.y, width: r.width, height: r.height, maximized: win.isMaximized() };
+  try { saveCfg(); } catch { /* settings folder not writable: the window just opens maximized next time */ }
 }
 
 if (!SELFTEST && !app.requestSingleInstanceLock()) app.quit();

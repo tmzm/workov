@@ -88,17 +88,6 @@ def wv_start_other_fleets():
             continue
         if time.time() - _WV_OTHER_STARTED.get(root, 0) < 300:
             continue
-        # its dashboard too, because that is where its questions are answered and its tickets reviewed
-        cfg = wv_fleet_json(root, "specs/worker-fleet.config.json")
-        dport = ((cfg.get("dashboard") or {}).get("port")) or 3080
-        if wv_norm_root(root) != wv_norm_root(REPO_ROOT) and not wv_port_open(dport) and (base / ".claude" / "scripts" / "start-dashboard.sh").exists():
-            _WV_OTHER_STARTED[root] = time.time()
-            (base / "job").mkdir(exist_ok=True)
-            dlog = open(base / "job" / "dashboard-server.log", "ab")
-            subprocess.Popen([wv_git_bash(), ".claude/scripts/start-dashboard.sh", "--tunnel", "local"], cwd=str(base), stdin=subprocess.DEVNULL,
-                             stdout=dlog, stderr=dlog, creationflags=WV_DETACH if os.name == "nt" else 0, start_new_session=(os.name != "nt"))
-            print(f"[wv] dashboard of {f['name']} started by this dashboard", file=sys.stderr)
-            continue
         try:
             text = (base / "specs" / "tickets" / "BOARD.md").read_text(encoding="utf-8")
         except OSError:

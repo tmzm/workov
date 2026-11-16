@@ -1,35 +1,64 @@
+def wv_project_ticket_dir(root, tid):
+    base = Path(root) / "specs" / "tickets"
+    try:
+        for d in sorted(base.iterdir()):
+            if d.is_dir() and d.name.startswith(tid + "-"):
+                return d
+    except OSError:
+        pass
+    return None
+
+
+def wv_project_set_status(root, tid, new_status):
+    """Board row and rd.md header of a ticket of another project: the same two edits the dashboard makes for its own."""
+    board = Path(root) / "specs" / "tickets" / "BOARD.md"
+    text = board.read_text(encoding="utf-8")
+    new_text, n = re.subn(rf"^(\|\s*{tid}\s*\|[^|]*\|\s*)[a-z-]+(\s*\|)", lambda m: m.group(1) + new_status + "   " + m.group(2), text, count=1, flags=re.M)
+    if not n:
+        return False
+    board.write_text(new_text, encoding="utf-8", newline="")
+    d = wv_project_ticket_dir(root, tid)
+    if d and (d / "rd.md").is_file():
+        rd = (d / "rd.md").read_text(encoding="utf-8")
+        rd2 = re.sub(r"^(\*\*Status:\*\*\s*).*$", lambda m: m.group(1) + new_status, rd, count=1, flags=re.M)
+        (d / "rd.md").write_text(rd2, encoding="utf-8", newline="")
+    return True
+
+
 def wv_project_action(req):
-    """One ticket action on any registered project, from the one board: dispatch (draft to ready), pause or restart. The
-    action is forwarded to that project's own dashboard with its own token, which never reaches the browser."""
-    import urllib.request
-    import urllib.error
+    """One ticket action on any registered project from the one board: dispatch (draft to ready) or pause. Done here, on
+    that project's own files: no second dashboard is involved."""
     name, tid, op = str(req.get("project") or ""), str(req.get("ticket") or ""), str(req.get("op") or "")
     fleet = next((f for f in wv_fleets() if f["name"] == name), None)
-    body = {
-        "dispatch": {"action": "set_ticket_status", "ticket": tid, "status": "ready"},
-        "pause": {"action": "pause_ticket", "ticket": tid},
-        "restart": {"action": "wv_retry_ticket", "ticket": tid},
-    }.get(op)
-    if not fleet or not re.fullmatch(r"\d{3}", tid) or body is None:
+    if not fleet or not re.fullmatch(r"\d{3}", tid) or op not in ("dispatch", "pause"):
         return 400, {"error": "Unknown project, ticket or operation."}
     root = fleet["root"]
-    port = ((wv_fleet_json(root, "specs/worker-fleet.config.json").get("dashboard") or {}).get("port")) or 3080
-    token = wv_fleet_json(root, "job/dashboard-auth.json").get("authToken")
-    if not token or not wv_port_open(port):
-        return 409, {"error": f"{name}'s dashboard is not running yet. It is started automatically; try again in a minute."}
-    req2 = urllib.request.Request(f"http://127.0.0.1:{port}/api/action", data=json.dumps(body).encode("utf-8"), method="POST")
-    req2.add_header("content-type", "application/json")
-    req2.add_header("authorization", "Bearer " + token)
-    req2.add_header("origin", f"http://127.0.0.1:{port}")
-    try:
-        with urllib.request.urlopen(req2, timeout=30) as r:
-            return r.status, json.loads(r.read().decode("utf-8") or "{}")
-    except urllib.error.HTTPError as e:
-        try:
-            return e.code, json.loads(e.read().decode("utf-8") or "{}")
-        except Exception:
-            return e.code, {"error": f"{name} answered {e.code}"}
-    except Exception as e:
-        return 502, {"error": str(e)[:160]}
+    row = next((r for r in wv_fleet_rows(root) if r["id"] == tid), None)
+    if not row:
+        return 404, {"error": f"Ticket {tid} not found in {name}."}
+    if op == "dispatch":
+        if row["status"] != "draft":
+            return 409, {"error": f"Ticket {tid} is '{row['status']}', not a draft."}
+        wv_project_set_status(root, tid, "ready")
+        return 200, {"ok": True, "note": f"Ticket {tid} of {name} is ready; its router picks it up on the next cycle."}
+    if row["status"] in ("done", "failed", "draft"):
+        return 409, {"error": f"Ticket {tid} is '{row['status']}', nothing to pause."}
+    ctl = Path(root) / "job" / "control"
+    ctl.mkdir(parents=True, exist_ok=True)
+    (ctl / f"{tid}.json").write_text(json.dumps({"action": "pause_ticket", "issuedAt": utc_now_iso(), "by": "dashboard"}) + "\n", encoding="utf-8")
+    return 200, {"ok": True, "note": f"Pause queued for ticket {tid} of {name}."}
+
+
+def wv_project_ticket(project, tid):
+    """The plan of a ticket of another project, to read in this dashboard."""
+    fleet = next((f for f in wv_fleets() if f["name"] == project), None)
+    if not fleet or not re.fullmatch(r"\d{3}", str(tid)):
+        return 404, {"error": "Unknown project or ticket."}
+    row = next((r for r in wv_fleet_rows(fleet["root"]) if r["id"] == tid), None)
+    d = wv_project_ticket_dir(fleet["root"], tid)
+    rd = ""
+    if d and (d / "rd.md").is_file():
+        rd = (d / "rd.md").read_text(encoding="utf-8", errors="replace")[:16000]
+    return 200, {"project": project, "ticket": tid, "title": (row or {}).get("title", ""), "status": (row or {}).get("status", ""), "rd": rd}
 
 
