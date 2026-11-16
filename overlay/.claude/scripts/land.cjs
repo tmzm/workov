@@ -221,10 +221,39 @@ function withoutTickets(branch, ticketDir) {
   return parent;
 }
 
+// The MR description is for the reviewer: only what they need, short and clear. Caps: Summary 3 bullets, Implementation 5,
+// Notes 4 (only important notes), each bullet one line (160 characters), the whole text 30 lines without Screenshots, and
+// no sections other than Summary / Implementation / Screenshots / Notes.
+function mrBodyProblems(body) {
+  const problems = [];
+  const caps = { Summary: 3, Implementation: 5, Notes: 4 };
+  const parts = String(body || '').replace(/\r\n/g, '\n').split(/^## /m).slice(1);
+  let lines = 0;
+  for (const part of parts) {
+    const name = part.split('\n')[0].trim();
+    const rest = part.split('\n').slice(1).filter((l) => l.trim());
+    if (!['Summary', 'Implementation', 'Screenshots', 'Notes'].includes(name)) problems.push(`section "${name}" is not allowed`);
+    if (name === 'Screenshots') continue;
+    lines += rest.length + 1;
+    const bullets = rest.filter((l) => /^\s*[-*] /.test(l));
+    if (caps[name] && bullets.length > caps[name]) problems.push(`${name} has ${bullets.length} bullets (max ${caps[name]})`);
+    for (const l of rest) if (l.length > 160) { problems.push(`a line in ${name} is ${l.length} characters (max 160)`); break; }
+  }
+  if (lines > 30) problems.push(`the description is ${lines} lines without screenshots (max 30)`);
+  for (const need of ['Summary', 'Implementation']) if (!parts.some((x) => x.startsWith(need))) problems.push(`the ${need} section is missing`);
+  return problems;
+}
+
 // Push and open or update the MR. draft=true (the fleet's merger): nothing is marked delivered yet;
 // Claude's review then runs `deliver`, which marks it ready and moves Plane and Ejad HR.
 async function openMr(t, branch, draft) {
   if (!t.title || !t.body) throw new Error('the delivery pack has no mr-title.txt or mr.md');
+  const mrProblems = mrBodyProblems(t.body);
+    if (mrProblems.length) {
+      const msg = 'the MR description is too long or off-format: ' + mrProblems.join('; ');
+      if (!draft) throw new Error(msg + '. Shorten delivery/mr.md and deliver again.');
+      log('WARN ' + msg);
+    }
   const gl = gitlab();
   const sha = withoutTickets(branch, t.ticketDir);
   await write(`git push origin ${branch} (${sha.slice(0, 8)}, local ticket files removed, evidence kept)`, () => sh('git', ['push', 'origin', `${sha}:refs/heads/${branch}`]));

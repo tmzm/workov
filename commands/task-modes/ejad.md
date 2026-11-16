@@ -203,6 +203,12 @@ root, kept out of git by adding `.delivery/` to `.git/info/exclude` (local only,
   - `## Screenshots`: only when there are screenshots; each as a bold caption line, then
     `![<caption>](screens/NN-<name>.png)`. Every screenshot taken is in it, uploaded to GitLab at delivery.
   - `## Notes`: deviations, backend gaps, overlaps with other MRs, follow-ups, and the checks run with their results.
+  Size caps (the description is for the reviewer: only what they need to know, easy and clear): `## Summary` at most 3
+  one-line bullets; `## Implementation` at most 5 one-line bullets (main pieces and non-obvious decisions, no file
+  lists, no re-listing of tests); `## Notes` at most 4 bullets and only what matters (deviations, backend gaps, overlaps,
+  follow-ups, anything the reviewer must check; the checks run only if one failed or was skipped); each line at most 160
+  characters; at most 30 lines in total without screenshots. `land.cjs` refuses to deliver a description that breaks
+  these caps.
   Short, no AI attribution.
 - `mr-title.txt`: one line, conventional style, matching the main commit.
 - `tracker.md`: the comment for Plane and Ejad HR (3–6 lines: what was done, checks, follow-ups), without the MR link
