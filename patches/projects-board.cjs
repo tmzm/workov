@@ -43,13 +43,14 @@ const path = require('path');
     if (!btn) throw new Error('anchor missing: Board tab button');
     h = h.replace(btn[1], btn[1] + '\n          <button type="button" class="tab-btn" data-tab="projects">\n            <svg class="i" aria-hidden="true"><use href="#i-board" /></svg\n            ><span class="lbl">All projects</span>\n          </button>');
     // 2. the panel, before Audit
-    if (!h.includes('      <!-- Audit -->')) throw new Error('anchor missing: Audit panel');
-    h = h.replace('      <!-- Audit -->', section + '      <!-- Audit -->');
-    // 3. hash maps, so the tab keeps a URL
+    const audit = /^[ \t]*<!-- Audit -->/m.exec(h);
+    if (!audit) throw new Error('anchor missing: Audit panel');
+    h = h.slice(0, audit.index) + section + h.slice(audit.index);
+    // 3. hash maps, so the tab keeps a URL (works for the one-line and the formatted layout)
     for (const name of ['VIEW_HASH', 'HASH_VIEW']) {
-      const k = `const ${name} = {\n        chat: 'chat',`;
-      if (!h.includes(k)) throw new Error('anchor missing: ' + name);
-      h = h.replace(k, k + "\n        projects: 'projects',");
+      const k = new RegExp('(const ' + name + ' = \\{)');
+      if (!k.test(h)) throw new Error('anchor missing: ' + name);
+      h = h.replace(k, "$1 projects: 'projects',");
     }
     // 4. the script, last, so it wraps the final wvNavSync
     const i = h.lastIndexOf('</body>');

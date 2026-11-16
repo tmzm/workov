@@ -1,5 +1,4 @@
-
-# ejad-fleet (worker-fleet + Ejad layer; local only, never committed)
+# wv-fleet (worker-fleet + Workerov layer; local only, never committed)
 job/
 __pycache__/
 .worker-fleet-backup/

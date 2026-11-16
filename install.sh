@@ -12,12 +12,13 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-TARGET=""; WF=""; DO_COMMAND=1; DO_SETUP=1
+TARGET=""; WF=""; DO_COMMAND=1; DO_SETUP=1; IN_PLACE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --worker-fleet) WF="$2"; shift 2 ;;
     --no-command) DO_COMMAND=0; shift ;;
     --no-setup) DO_SETUP=0; shift ;;
+    --in-place) IN_PLACE=1; shift ;;
     -h|--help) sed -n 2,10p "$0"; exit 0 ;;
     *) TARGET="$1"; shift ;;
   esac
@@ -28,6 +29,29 @@ if [ -z "$WF" ]; then
   WF="$HERE/vendor/worker-fleet"
 fi
 TARGET="$(cd "$TARGET" && pwd)"
+# A project's fleet lives in its own managed folder (a clone under ~/Workerov/fleets/<name>), so your working copy never
+# gets fleet files, an edited opencode.json or a job/ folder. Work still reaches your repo the normal way: the fleet pushes
+# a branch and opens a draft MR. A folder that already holds a fleet (specs/worker-fleet.config.json) is upgraded in place,
+# and --in-place keeps the old behaviour of installing straight into the given repo.
+if [ "$IN_PLACE" = 0 ] && [ ! -f "$TARGET/specs/worker-fleet.config.json" ]; then
+  FLEETS_DIR="${WV_FLEETS_DIR:-$HOME/Workerov/fleets}"
+  NAME="${WV_PROJECT_NAME:-$(basename "$TARGET")}"
+  HOME_DIR="$FLEETS_DIR/$NAME"
+  ORIGIN_URL="$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)"
+  mkdir -p "$FLEETS_DIR"
+  if [ ! -d "$HOME_DIR/.git" ]; then
+    echo "creating the fleet home for $NAME at $HOME_DIR (your repo is not touched)"
+    git clone --quiet "$TARGET" "$HOME_DIR"
+    [ -n "$ORIGIN_URL" ] && git -C "$HOME_DIR" remote set-url origin "$ORIGIN_URL"
+  fi
+  if [ -n "$ORIGIN_URL" ]; then
+    git -C "$HOME_DIR" fetch --quiet origin || echo "warning: could not fetch origin; the fleet home keeps the commits it has" >&2
+    BR="$(git -C "$HOME_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')"
+    [ -n "$BR" ] || BR="$(git -C "$TARGET" symbolic-ref --quiet --short HEAD 2>/dev/null || echo main)"
+    git -C "$HOME_DIR" checkout --quiet -B "$BR" "origin/$BR" 2>/dev/null || true
+  fi
+  TARGET="$(cd "$HOME_DIR" && pwd)"
+fi
 for bin in git node; do command -v "$bin" >/dev/null || { echo "missing $bin" >&2; exit 2; }; done
 # Windows ships a python3.exe/python.exe "app execution alias" stub under WindowsApps that sits on PATH ahead of a
 # real install and does nothing but redirect to the Store, so `command -v python3` alone proves nothing here; a real
