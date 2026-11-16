@@ -2,7 +2,7 @@
 //  - Board, Chat, Providers and Telemetry stay on the bar; Ring, Graph, Ports and Audit move under "More"
 //    (a dropdown on the desktop bar, a sheet above the bottom bar on a phone). Their buttons keep data-tab, so every
 //    existing route, hash and script keeps working.
-//  - Chat is a tab that only exists inside the Workeve desktop app (window.fleetShell, given by its preload). The app
+//  - Chat is a tab that only exists inside the Workerov desktop app (window.fleetShell, given by its preload). The app
 //    lays its local chat view over the tab's host area. A browser, a phone or the tunnel never gets the tab or the chat.
 const fs = require('fs');
 const H = '.claude/dashboard/index.html';
@@ -31,7 +31,7 @@ if (!h.includes('id="views-more"')) {
 
   // 4. the Chat section (its host area is where the desktop app places the chat view)
   const sec = `<section id="tab-chat" class="tab-content" aria-labelledby="h-chat"><h1 id="h-chat" class="sr-only">Chat</h1>
-<div id="chat-host" class="chat-host"><p class="note-s chat-note" id="chat-note">Chat runs inside the Workeve desktop app. It is not available from a browser or the phone link.</p></div></section>
+<div id="chat-host" class="chat-host"><p class="note-s chat-note" id="chat-note">Chat runs inside the Workerov desktop app. It is not available from a browser or the phone link.</p></div></section>
 `;
   if (!/<section id="tab-ports"/.test(h)) fail('tab-ports');
   h = h.replace(/<section id="tab-ports"/, () => sec + '<section id="tab-ports"');

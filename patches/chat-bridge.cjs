@@ -23,7 +23,7 @@ def wv_chat_bridge():
 def wv_chat_request(method, path, body=None, timeout=60):
     b = wv_chat_bridge()
     if not b:
-        return 503, {"error": "Open the Workeve app on your computer to use the chat."}
+        return 503, {"error": "Open the Workerov app on your computer to use the chat."}
     import http.client
     try:
         conn = http.client.HTTPConnection("127.0.0.1", b[0], timeout=timeout)
@@ -37,7 +37,7 @@ def wv_chat_request(method, path, body=None, timeout=60):
         except ValueError:
             return resp.status, {"error": "The chat gave an unreadable answer."}
     except Exception:
-        return 503, {"error": "The Workeve app is not answering. Open it on your computer."}
+        return 503, {"error": "The Workerov app is not answering. Open it on your computer."}
 
 
 def wv_chat_call(req):
@@ -63,7 +63,7 @@ def wv_chat_asset(name):
         conn.close()
         return r.status, ctype, data
     except Exception:
-        return 503, "text/plain", b"The Workeve app is not answering."
+        return 503, "text/plain", b"The Workerov app is not answering."
 
 ` + '\ndef wv_run_action(action, req, tid):');
   sub('WV_ACTIONS = (', 'WV_ACTIONS = ("chat_call", ');
@@ -75,7 +75,7 @@ def wv_chat_asset(name):
   sub('    def do_GET(self):\n', String.raw`    def _chat_events(self):
         b = wv_chat_bridge()
         if not b:
-            self._send_json(503, {"error": "Open the Workeve app on your computer to use the chat."})
+            self._send_json(503, {"error": "Open the Workerov app on your computer to use the chat."})
             return
         import http.client
         try:
@@ -83,7 +83,7 @@ def wv_chat_asset(name):
             conn.request("GET", "/events", headers={"X-Bridge-Secret": b[1]})
             resp = conn.getresponse()
         except Exception:
-            self._send_json(503, {"error": "The Workeve app is not answering."})
+            self._send_json(503, {"error": "The Workerov app is not answering."})
             return
         if resp.status != 200:
             self._send_json(resp.status, {"error": "The chat is switched off in the app."})

@@ -1,0 +1,32 @@
+def wv_retry_ticket(tid):
+    """A clean restart of a failed/dead ticket: a fresh retry budget, no leftover death record, a ready board row.
+    Unlike moving the board status by hand, this also resets the router's own ledger, so the next dispatch is a
+    properly tracked attempt 1 (not an orphaned session the router doesn't know about, and not one that the retry
+    counter still thinks is exhausted)."""
+    status = get_ticket_status_for_control(tid)
+    if status not in ("failed", "budget-exceeded", "blocked"):
+        return 400, {"error": f"Ticket {tid} is '{status}', not failed/dead. Nothing to restart."}
+    (REPO_ROOT / "job" / "control" / f"{tid}.json").unlink(missing_ok=True)
+    state = wv_router_state()
+    for v in state.values():
+        if isinstance(v, list):
+            for e in v:
+                if isinstance(e, dict) and str(e.get("ticket", "")).startswith(tid + "-"):
+                    e["retriesUsed"] = 0
+                    e["attempt"] = 1
+                    e.pop("lastDeath", None)
+                    e["lastPhase"] = "ready"
+                    e["lastPhaseAt"] = utc_now_iso()
+                    if isinstance(e.get("budget"), dict):
+                        e["budget"]["turnsUsed"] = 0
+                        e["budget"]["estCostUsd"] = 0.0
+    wv_atomic_write(REPO_ROOT / "job" / "router-state.json", json.dumps(state, indent=2))
+    board = REPO_ROOT / "specs" / "tickets" / "BOARD.md"
+    text = board.read_text(encoding="utf-8")
+    new_text = re.sub(rf"^(\|\s*{tid}\s*\|[^|]*\|\s*)(?:failed|budget-exceeded|blocked)(\s*\|)", lambda m: m.group(1) + "ready      " + m.group(2), text, count=1, flags=re.M)
+    if new_text == text:
+        return 404, {"error": f"Ticket {tid} not found on the board."}
+    wv_atomic_write(board, new_text)
+    return 200, {"ok": True, "ticket": tid, "note": "Retry budget reset and the board row set to ready. The router dispatches it fresh on its next cycle."}
+
+
