@@ -50,15 +50,50 @@ def wv_project_action(req):
 
 
 def wv_project_ticket(project, tid):
-    """The plan of a ticket of another project, to read in this dashboard."""
+    """A ticket of another project in exactly the shape /api/ticket/<id> has, so the one dashboard's drawer shows it."""
     fleet = next((f for f in wv_fleets() if f["name"] == project), None)
     if not fleet or not re.fullmatch(r"\d{3}", str(tid)):
         return 404, {"error": "Unknown project or ticket."}
     row = next((r for r in wv_fleet_rows(fleet["root"]) if r["id"] == tid), None)
     d = wv_project_ticket_dir(fleet["root"], tid)
-    rd = ""
-    if d and (d / "rd.md").is_file():
-        rd = (d / "rd.md").read_text(encoding="utf-8", errors="replace")[:16000]
-    return 200, {"project": project, "ticket": tid, "title": (row or {}).get("title", ""), "status": (row or {}).get("status", ""), "rd": rd}
+    if not d:
+        return 404, {"error": f"Ticket {tid} not found in {project}."}
+
+    def rd_file(name):
+        p = d / name
+        return p.read_text(encoding="utf-8", errors="ignore") if p.is_file() else None
+
+    results_json = None
+    try:
+        if (d / "results.json").is_file():
+            parsed = json.loads((d / "results.json").read_text(encoding="utf-8"))
+            results_json = parsed if isinstance(parsed, dict) else None
+    except (OSError, ValueError):
+        results_json = None
+    evidence = []
+    if (d / "evidence").is_dir():
+        for ef in sorted((d / "evidence").iterdir()):
+            if ef.is_file():
+                evidence.append({"name": ef.name, "isImage": ef.suffix.lower() in EVIDENCE_IMAGE_TYPES, "size": ef.stat().st_size,
+                                 "url": "/api/wv/project-evidence?project=" + urllib.parse.quote(project) + "&ticket=" + tid + "&name=" + urllib.parse.quote(ef.name)})
+    return 200, {"id": tid, "project": project, "title": (row or {}).get("title", ""), "status": (row or {}).get("status", ""),
+                 "folder": d.name, "rd": rd_file("rd.md"), "eval": rd_file("eval.md"), "contract": rd_file("contract.md"),
+                 "results": rd_file("results.md"), "resultsJson": results_json, "decision": rd_file("user-decision.md"),
+                 "mockup": False, "evidence": evidence, "git": None}
+
+
+def wv_project_evidence(project, tid, name):
+    fleet = next((f for f in wv_fleets() if f["name"] == project), None)
+    d = wv_project_ticket_dir(fleet["root"], tid) if fleet and re.fullmatch(r"\d{3}", str(tid)) else None
+    if not d or "/" in name or chr(92) in name or name.startswith("."):
+        return None
+    f = d / "evidence" / name
+    if not f.is_file() or not f.resolve().is_relative_to((d / "evidence").resolve()):
+        return None
+    mime = EVIDENCE_IMAGE_TYPES.get(f.suffix.lower(), EVIDENCE_TEXT_TYPE)
+    data = f.read_bytes()
+    if mime == EVIDENCE_TEXT_TYPE:
+        data = scrub_secret_bytes(data, live_secret_values())
+    return mime, data
 
 

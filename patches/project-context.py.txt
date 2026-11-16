@@ -1,0 +1,64 @@
+# ---- one server for every project: a request about a ticket of another project runs in that project's folder ----
+# A ticket of another project has an id like "MEL-001" (the first three letters of the project's name, then its number).
+# Any request that names such a ticket (in the path, the query or a "ticket" field of the body) is run by the SAME handler
+# code as a local ticket, with REPO_ROOT and the files derived from it pointing at that project's folder for the duration
+# of that one request, in that request's thread only. So the drawer, its tabs, evidence, logs, mockups, dispatch, pause,
+# stop, review, deliver and every other ticket action work for every project in exactly the same way.
+_WV_ID_RE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,3})-(\d{3})(?!\d)")
+_WV_BODY_ID_RE = re.compile(r'("ticket"\s*:\s*")([A-Z]{2,3})-(\d{3})(")')
+
+
+def wv_ctx_prefix():
+    return getattr(_WV_CTX, "prefix", "")
+
+
+def wv_project_by_prefix(prefix):
+    for f in wv_fleets():
+        if wv_norm_root(f["root"]) == wv_norm_root(_WV_BASE_ROOT):
+            continue
+        if re.sub(r"[^A-Za-z0-9]", "", f["name"])[:3].upper() == prefix:
+            return f
+    return None
+
+
+def _wv_scoped(orig):
+    import io as _io
+
+    def run(self):
+        found = []
+
+        def swap(prefix, num, whole):
+            f = wv_project_by_prefix(prefix)
+            if not f or (found and found[0][0] != prefix):
+                return whole
+            if not found:
+                found.append((prefix, f))
+            return num
+
+        self.path = _WV_ID_RE.sub(lambda m: swap(m.group(1), m.group(2), m.group(0)), self.path)
+        saved_rfile = self.rfile
+        try:
+            if self.command == "POST":
+                n = int(self.headers.get("Content-Length") or 0)
+                body = self.rfile.read(n) if n else b""
+                text = _WV_BODY_ID_RE.sub(lambda m: m.group(1) + swap(m.group(2), m.group(3), m.group(2) + "-" + m.group(3)) + m.group(4), body.decode("utf-8", "replace"))
+                new_body = text.encode("utf-8")
+                del self.headers["Content-Length"]
+                self.headers["Content-Length"] = str(len(new_body))
+                self.rfile = _io.BytesIO(new_body)
+            if found:
+                _WV_CTX.root = found[0][1]["root"]
+                _WV_CTX.prefix = found[0][0] + "-"
+            return orig(self)
+        finally:
+            _WV_CTX.root = None
+            _WV_CTX.prefix = ""
+            self.rfile = saved_rfile
+
+    return run
+
+
+for _wv_m in ("do_GET", "do_POST"):
+    setattr(FleetControlHandler, _wv_m, _wv_scoped(getattr(FleetControlHandler, _wv_m)))
+
+

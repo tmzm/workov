@@ -1,0 +1,70 @@
+<script>
+  (function () {
+    var KEY = 'wv_board_project', foreign = [], names = [], selected = 'all';
+    try { selected = localStorage.getItem(KEY) || 'all'; } catch (e) { /* storage blocked */ }
+    function pre(name) { return String(name).replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || 'PRJ'; }
+    window.wvBoardTickets = function (local) {
+      var out = [];
+      if (selected === 'all' || selected === window.__wvSelf) out = out.concat(local);
+      foreign.forEach(function (t) { if (selected === 'all' || selected === t.wvProject) out.push(t); });
+      return out;
+    };
+    function drafts(local) {
+      var out = local.filter(function (t) { return String(t.status || '').toLowerCase() === 'draft'; }).map(function (t) { return { id: t.id, local: true }; });
+      foreign.forEach(function (t) { if (t.status === 'draft') out.push({ id: t.id, project: t.wvProject, raw: t.wvRaw }); });
+      return out;
+    }
+    window.wvDraftCount = function (local) { return drafts(local).length; };
+    window.wvReviewDrafts = function () {
+      var list = drafts((typeof stateData !== 'undefined' && stateData && stateData.tickets) || []);
+      jumpToStage('plan');
+      if (!list.length) return;
+      var d = list[0];
+      if (d.local) openTicketDrawer(d.id); else window.wvOpenForeign(d.project, d.raw);
+    };
+    var box = document.getElementById('board-project'), wrap = document.getElementById('board-project-wrap');
+    function fill() {
+      if (!box) return;
+      var want = ['all'].concat(names);
+      if (box.options.length !== want.length || want.some(function (n, i) { return box.options[i].value !== n; })) {
+        box.textContent = '';
+        want.forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n === 'all' ? 'All projects' : n; box.append(o); });
+      }
+      if (want.indexOf(selected) < 0) selected = 'all';
+      box.value = selected;
+      if (wrap) wrap.hidden = names.length < 2;
+    }
+    function redraw() { if (typeof renderState === 'function') renderState(); }
+    if (box) box.addEventListener('change', function () {
+      selected = box.value;
+      try { localStorage.setItem(KEY, selected); } catch (e) { /* storage blocked */ }
+      redraw();
+    });
+    var last = '';
+    function load() {
+      var hd = {}; var tk = ''; try { tk = localStorage.getItem('worker_fleet_token') || ''; } catch (e) { /* none */ }
+      if (tk) hd.Authorization = 'Bearer ' + tk;
+      fetch('/api/wv/projects', { headers: hd }).then(function (r) { return r.json(); }).then(function (d) {
+        var next = [];
+        names = (d.projects || []).map(function (p) { return p.name; });
+        (d.projects || []).forEach(function (p) {
+          if (p.self) { window.__wvSelf = p.name; return; }
+          p.tickets.forEach(function (t) {
+            next.push({ id: pre(p.name) + '-' + t.id, title: t.title, status: t.status, mode: t.mode || 'solo', prio: 'P1', runs: 'alongside', deps: [], dependents: [], wvProject: p.name, wvRaw: t.id });
+          });
+        });
+        var sig = JSON.stringify([names, next.map(function (t) { return [t.id, t.status, t.title]; })]);
+        foreign = next; fill();
+        if (sig !== last) { last = sig; redraw(); }
+      }).catch(function () { /* the board still shows the local tickets */ });
+    }
+    // A ticket of another project opens in THIS dashboard's own drawer: its id is "<PRE>-001" and the drawer reads it
+    // through /api/wv/project-ticket (same shape as /api/ticket/<id>).
+    function foreignById(id) { for (var i = 0; i < foreign.length; i++) if (foreign[i].id === id) return foreign[i]; return null; }
+    window.wvForeignById = foreignById;
+    window.wvOpenForeign = function (project, raw) {
+      for (var i = 0; i < foreign.length; i++) if (foreign[i].wvProject === project && foreign[i].wvRaw === raw) { openTicketDrawer(foreign[i].id); return; }
+    };
+    fill(); load(); setInterval(load, 6000);
+  })();
+</script>

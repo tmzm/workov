@@ -21,7 +21,8 @@ const path = require('path');
     s = s.replace(a, code + a);
     const r = '        if path == "/api/wv/overview":';
     if (!s.includes(r)) throw new Error('anchor missing: /api/wv/overview route');
-    s = s.replace(r, '        if path == "/api/wv/projects":\n            self._send_json(200, wv_projects())\n            return\n\n        if path == "/api/wv/project-ticket":\n            qs = urllib.parse.parse_qs(parsed.query)\n            code, payload = wv_project_ticket(qs.get("project", [""])[0], qs.get("ticket", [""])[0])\n            self._send_json(code, payload)\n            return\n\n' + r);
+    const evRoute = fs.readFileSync(path.join(__dirname, 'project-evidence.route.txt'), 'utf8').replace(/\r\n/g, '\n');
+    s = s.replace(r, evRoute + '        if path == "/api/wv/projects":\n            self._send_json(200, wv_projects())\n            return\n\n        if path == "/api/wv/project-ticket":\n            qs = urllib.parse.parse_qs(parsed.query)\n            code, payload = wv_project_ticket(qs.get("project", [""])[0], qs.get("ticket", [""])[0])\n            self._send_json(code, payload)\n            return\n\n' + r);
     fs.writeFileSync(F, crlf ? s.replace(/\n/g, '\r\n') : s);
     console.log('projects board: server patched');
   }

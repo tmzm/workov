@@ -1,0 +1,36 @@
+    // A ticket of another project opens in THIS dashboard's own drawer: its id is "<PRE>-001" and the drawer reads it
+    // through /api/wv/project-ticket (same shape as /api/ticket/<id>).
+    function foreignById(id) { for (var i = 0; i < foreign.length; i++) if (foreign[i].id === id) return foreign[i]; return null; }
+    window.wvForeignById = foreignById;
+    window.wvTicketUrl = function (id) {
+      var f = foreignById(id);
+      return f ? '/api/wv/project-ticket?project=' + encodeURIComponent(f.wvProject) + '&ticket=' + encodeURIComponent(f.wvRaw) : null;
+    };
+    window.wvOpenForeign = function (project, raw) {
+      for (var i = 0; i < foreign.length; i++) if (foreign[i].wvProject === project && foreign[i].wvRaw === raw) { openTicketDrawer(foreign[i].id); return; }
+    };
+    // the drawer's action row for a foreign ticket: Dispatch (draft) or Pause, done by the hub on that project's files
+    window.wvForeignControl = function (id) {
+      var f = foreignById(id), box = document.getElementById('drawer-control-container');
+      if (!f || !box) return false;
+      box.textContent = '';
+      var note = document.getElementById('drawer-auth-note'); if (note) note.hidden = true;
+      var hd = { 'Content-Type': 'application/json' }, tk = ''; try { tk = localStorage.getItem('worker_fleet_token') || ''; } catch (e) { /* none */ }
+      if (tk) hd.Authorization = 'Bearer ' + tk;
+      var msg = document.createElement('span'); msg.className = 'note-s'; msg.setAttribute('role', 'status');
+      var tag = document.createElement('span'); tag.className = 'plate quiet'; tag.textContent = f.wvProject; box.append(tag);
+      function btn(op, label, primary) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (primary ? ' primary' : ''); b.textContent = label;
+        b.addEventListener('click', function () {
+          if (!confirm(label + ' ticket ' + f.wvRaw + ' of ' + f.wvProject + '?')) return;
+          fetch('/api/action', { method: 'POST', headers: hd, body: JSON.stringify({ action: 'wv_project_action', project: f.wvProject, ticket: f.wvRaw, op: op }) })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (x) { msg.textContent = x.ok ? (x.j.note || 'Done.') : (x.j.error || 'Could not do that.'); load(); });
+        });
+        box.append(b);
+      }
+      if (f.status === 'draft') btn('dispatch', 'Dispatch', true);
+      else if (f.status === 'in-progress' || f.status === 'ready') btn('pause', 'Pause', false);
+      box.append(msg);
+      return true;
+    };
