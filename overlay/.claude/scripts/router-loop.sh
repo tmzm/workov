@@ -33,7 +33,7 @@ active() { working || answered; }
 # A project that is only waiting for another project's worker (nothing of its own building, no answered decision to hand
 # over) needs no model call: sleeping costs nothing, a cycle that only says "dispatch paused" costs tokens every interval.
 waiting_only() {
-  [ -n "$(python3 -I "$HOME/.wv-bin/wv-busy.py" "$PWD" 2>/dev/null | tr -d '')" ] || return 1
+  [ -n "$(python3 -I "$HOME/.wv-bin/wv-busy.py" "$PWD" 2>/dev/null | tr -d '\r')" ] || return 1
   grep -qE '^\| [0-9]{3} .*\| in-progress *\|' specs/tickets/BOARD.md && return 1
   answered && return 1
   return 0
