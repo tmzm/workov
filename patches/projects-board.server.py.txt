@@ -65,7 +65,16 @@ def wv_projects():
         rows = wv_fleet_rows(root)
         for r in rows:
             r["running"] = r["id"] in live
+        turn = ""
+        try:
+            tp = Path.home() / ".wv-bin" / "wv-turn.py"
+            if tp.is_file():
+                r = subprocess.run([sys.executable, "-I", str(tp), root, "--peek"], capture_output=True, text=True, timeout=8, creationflags=WV_NOWIN)
+                turn = (r.stdout or "").strip()
+        except Exception:
+            turn = ""
         projects.append({
+            "router": turn,
             "name": f["name"], "root": root, "port": port, "online": wv_port_open(port),
             "off": (Path(root) / "job" / "fleet-off").exists(), "tickets": rows, "runningCount": len(live),
             "self": wv_norm_root(root) == wv_norm_root(REPO_ROOT),

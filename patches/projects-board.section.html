@@ -38,6 +38,7 @@
               head.append(el('strong', '', p.name));
               head.append(el('span', 'note-s', p.tickets.length + (p.tickets.length === 1 ? ' ticket' : ' tickets')));
               if (p.off) head.append(el('span', 'badge', 'fleet off'));
+              else if (p.router) head.append(el('span', 'badge' + (p.router === 'run' ? ' badge-accent' : ''), p.router === 'run' ? 'router: its turn' : 'router: ' + p.router));
               card.append(head);
               var rows = p.tickets.slice().sort(function (x, y) { return ORDER.indexOf(x.status) - ORDER.indexOf(y.status) || x.id.localeCompare(y.id); });
               if (!rows.length) card.append(el('div', 'note-s', 'No tickets yet.'));

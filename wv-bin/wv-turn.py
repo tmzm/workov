@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""wv-turn.py <this-fleet-root>
+"""wv-turn.py <this-fleet-root> [--peek]
 
 The one router: every registered project (~/.workerov/fleets.json) has its own router loop, but only the project whose turn
 it is makes a router model call. Prints "run" and exits 0 when this project's loop should run a cycle now, otherwise prints
@@ -10,6 +10,7 @@ why it waits and exits 1 (the loop then just sleeps, which costs nothing).
   2. A project with only ready tickets may start work only when no project has a live worker (one worker at a time on the
      computer). When several projects are ready, the one that ran longest ago goes first (fair turns).
   3. A project that is switched off (job/fleet-off), or has nothing ready or running, never runs.
+--peek only reports, it never takes the turn (the dashboard uses it).
 A worker counts as live when its entry in job/router-state.json has a port that is listening."""
 import json
 import re
@@ -64,7 +65,9 @@ def info(root):
 
 
 def main():
-    me = sys.argv[1] if len(sys.argv) > 1 else ""
+    args = [a for a in sys.argv[1:] if a != "--peek"]
+    peek = "--peek" in sys.argv
+    me = args[0] if args else ""
     fleets = read_json(Path.home() / ".workerov" / "fleets.json")
     fleets = fleets if isinstance(fleets, list) else []
     roots = [str(f.get("root", "")) for f in fleets if isinstance(f, dict) and f.get("root")]
@@ -91,7 +94,7 @@ def main():
     if norm(first) != norm(me):
         print("waiting: it is " + Path(first).name + "'s turn")
         return 1
-    return _ok(me, record=True)
+    return _ok(me, record=not peek)
 
 
 def _ok(me, record):
