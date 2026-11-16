@@ -1,0 +1,117 @@
+WV_FLEETS_FILE = Path.home() / ".workerov" / "fleets.json"
+
+
+def wv_norm_root(p):
+    return str(p).replace("\\", "/").rstrip("/").lower()
+
+
+def wv_fleets():
+    """Every fleet registered on this machine ([{name, root}] in ~/.workerov/fleets.json); this one is always listed."""
+    try:
+        items = json.loads(WV_FLEETS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        items = []
+    out, seen = [], set()
+    for it in (items if isinstance(items, list) else []) + [{"name": REPO_ROOT.name, "root": str(REPO_ROOT)}]:
+        if not isinstance(it, dict):
+            continue
+        root = str(it.get("root", "")).replace("\\", "/").rstrip("/")
+        key = wv_norm_root(root)
+        if not root or key in seen:
+            continue
+        seen.add(key)
+        out.append({"name": str(it.get("name") or Path(root).name), "root": root})
+    return out
+
+
+def wv_port_open(port):
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", int(port)), 0.4):
+            return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def wv_fleet_json(root, rel):
+    try:
+        return json.loads((Path(root) / rel).read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def wv_fleet_rows(root):
+    rows = []
+    try:
+        text = (Path(root) / "specs" / "tickets" / "BOARD.md").read_text(encoding="utf-8")
+    except OSError:
+        return rows
+    for m in re.finditer(r"^\|\s*(\d{3})\s*\|\s*([^|]*?)\s*\|\s*([a-z-]+)\s*\|\s*([a-z]+)?", text, re.M):
+        rows.append({"id": m.group(1), "title": m.group(2), "status": m.group(3), "mode": m.group(4) or ""})
+    return rows
+
+
+def wv_projects():
+    """One board for every project on this computer: each fleet's tickets plus which worker is alive (one at a time)."""
+    projects = []
+    for f in wv_fleets():
+        root = f["root"]
+        cfg = wv_fleet_json(root, "specs/worker-fleet.config.json")
+        port = ((cfg.get("dashboard") or {}).get("port")) or 3080
+        live = {}
+        for e in wv_fleet_json(root, "job/router-state.json").get("dispatched", []) or []:
+            if isinstance(e, dict) and wv_port_open(e.get("port")):
+                live[str(e.get("ticket", "")).split("-")[0]] = e.get("port")
+        rows = wv_fleet_rows(root)
+        for r in rows:
+            r["running"] = r["id"] in live
+        projects.append({
+            "name": f["name"], "root": root, "port": port, "online": wv_port_open(port),
+            "off": (Path(root) / "job" / "fleet-off").exists(), "tickets": rows, "runningCount": len(live),
+            "self": wv_norm_root(root) == wv_norm_root(REPO_ROOT),
+        })
+    return {"projects": projects, "workerActive": [p["name"] for p in projects if p["runningCount"]]}
+
+
+_WV_OTHER_STARTED = {}
+
+
+def wv_start_other_fleets():
+    """Start the router loop of every other registered project that has work, so this one dashboard drives them all.
+    router-loop.sh exits at once when a loop is already running, and each project is tried at most every 5 minutes."""
+    for f in wv_fleets():
+        root = f["root"]
+        if wv_norm_root(root) == wv_norm_root(REPO_ROOT):
+            continue
+        base = Path(root)
+        if (base / "job" / "fleet-off").exists() or not (base / ".claude" / "scripts" / "router-loop.sh").exists():
+            continue
+        if time.time() - _WV_OTHER_STARTED.get(root, 0) < 300:
+            continue
+        try:
+            text = (base / "specs" / "tickets" / "BOARD.md").read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if not re.search(r"^\|\s*\d{3}\s*\|[^|]*\|\s*(ready|in-progress|specifying)\s*\|", text, re.M):
+            continue
+        _WV_OTHER_STARTED[root] = time.time()
+        (base / "job").mkdir(exist_ok=True)
+        log = open(base / "job" / "router-loop.log", "ab")
+        subprocess.Popen([wv_git_bash(), ".claude/scripts/router-loop.sh"], cwd=str(base), stdin=subprocess.DEVNULL,
+                         stdout=log, stderr=log, creationflags=WV_DETACH if os.name == "nt" else 0, start_new_session=(os.name != "nt"))
+        print(f"[wv] router loop of {f['name']} started by this dashboard", file=sys.stderr)
+
+
+def wv_autostart_others():
+    time.sleep(40)
+    while True:
+        try:
+            wv_start_other_fleets()
+        except Exception as e:
+            print(f"[wv] starting the other projects failed: {e}", file=sys.stderr)
+        time.sleep(30)
+
+
+threading.Thread(target=wv_autostart_others, daemon=True).start()
+
+

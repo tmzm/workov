@@ -72,7 +72,25 @@ fi
 
 # 4. the Workerov layer: overlay files, then patches (after setup, which regenerates agent files)
 cp -R "$HERE/overlay/." "$TARGET/"
-for p in agents worker dashboard agent-logs agent-roster decision-help dashboard-run dashboard-review dashboard-pause dashboard-overlay dashboard-fixes dashboard-insight dashboard-providers2 dashboard-connect dashboard-providers-page dashboard-providers-tab dashboard-providers-v2 dashboard-keystore dashboard-issue dashboard-answered dashboard-roster dashboard-readonly dashboard-router dashboard-mobile dashboard-theme dashboard-themes2 dashboard-polish named-tunnel tunnel-windows resource-rules dashboard-processes ask-before-skip never-discard router-no-heavy delegate windows designer dashboard-claude dashboard-claude-account dashboard-cardfix telemetry-v2 dashboard-agentmodels dispatch-reliable failover dashboard-workers dashboard-workers2 worker-worktree land-branch dashboard-nav-chat dashboard-chat-theme chat-bridge dashboard-chat-web agent-steps dashboard-steps; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
+for p in agents worker dashboard agent-logs agent-roster decision-help dashboard-run dashboard-review dashboard-pause dashboard-overlay dashboard-fixes dashboard-insight dashboard-providers2 dashboard-connect dashboard-providers-page dashboard-providers-tab dashboard-providers-v2 dashboard-keystore dashboard-issue dashboard-answered dashboard-roster dashboard-readonly dashboard-router dashboard-mobile dashboard-theme dashboard-themes2 dashboard-polish named-tunnel tunnel-windows resource-rules dashboard-processes ask-before-skip never-discard router-no-heavy projects-board delegate windows designer dashboard-claude dashboard-claude-account dashboard-cardfix telemetry-v2 dashboard-agentmodels dispatch-reliable failover dashboard-workers dashboard-workers2 worker-worktree land-branch dashboard-nav-chat dashboard-chat-theme chat-bridge dashboard-chat-web agent-steps dashboard-steps; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
+
+# Register this project in the machine-wide fleet list: the one dashboard shows every project's tickets, and only one
+# worker runs at a time across them. WV_PROJECT_NAME overrides the display name (default: the folder name).
+mkdir -p "$HOME/.workerov"
+"$PY3" - "$TARGET" "${WV_PROJECT_NAME:-}" <<'PYREG'
+import json, os, sys
+root = sys.argv[1].replace("\\", "/").rstrip("/")
+name = sys.argv[2] or os.path.basename(root)
+path = os.path.join(os.path.expanduser("~"), ".workerov", "fleets.json")
+try:
+    items = json.load(open(path, encoding="utf-8"))
+except Exception:
+    items = []
+if not any(str(i.get("root", "")).replace("\\", "/").rstrip("/").lower() == root.lower() for i in items if isinstance(i, dict)):
+    items.append({"name": name, "root": root})
+    json.dump(items, open(path, "w", encoding="utf-8"), indent=2)
+    print("registered " + name + " in ~/.workerov/fleets.json")
+PYREG
 
 # A running OpenCode background server keeps the agent list it loaded at start: without a reload, new agents such
 # as `worker` fail with "Agent not found" when the router dispatches them.

@@ -1,0 +1,77 @@
+      <!-- All projects -->
+      <section id="tab-projects" class="tab-content" aria-labelledby="h-projects">
+        <div class="view-pad">
+          <h1 id="h-projects" class="sr-only">All projects</h1>
+          <h2 class="sec">
+            All projects <span id="projects-worker" class="badge badge-accent">loading…</span>
+          </h2>
+          <p class="note-s" style="margin-bottom: 12px; max-width: 72ch">
+            Every project on this computer on one board. Only one worker runs at a time, whichever project it comes from;
+            the other tickets wait their turn.
+          </p>
+          <div id="projects-board" aria-live="polite"></div>
+        </div>
+      </section>
+      <script>
+        (function () {
+          var box = document.getElementById('projects-board');
+          if (!box) return;
+          var timer = null;
+          var ORDER = ['blocked', 'failed', 'in-review', 'in-progress', 'ready', 'specifying', 'draft', 'budget-exceeded', 'done'];
+          var LABEL = { blocked: 'Needs you', failed: 'Failed', 'in-review': 'In review', 'in-progress': 'Building', ready: 'Ready', specifying: 'Planning', draft: 'Draft', 'budget-exceeded': 'Over budget', done: 'Done' };
+          function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+          function token() { try { return localStorage.getItem('worker_fleet_token') || ''; } catch (e) { return ''; } }
+          function link(p, t) {
+            if (p.self) return '#ticket/' + t.id;
+            return location.protocol + '//' + location.hostname + ':' + p.port + '/#ticket/' + t.id;
+          }
+          function render(d) {
+            box.textContent = '';
+            var act = d.workerActive || [];
+            var badge = document.getElementById('projects-worker');
+            if (badge) badge.textContent = act.length ? 'worker busy: ' + act.join(', ') : 'worker free';
+            (d.projects || []).forEach(function (p) {
+              var card = el('div', '', '');
+              card.style.cssText = 'border:1px solid var(--line, #8884);border-radius:10px;padding:12px 14px;margin-bottom:12px';
+              var head = el('div', '', '');
+              head.style.cssText = 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px';
+              head.append(el('strong', '', p.name));
+              head.append(el('span', 'note-s', p.tickets.length + (p.tickets.length === 1 ? ' ticket' : ' tickets')));
+              if (p.off) head.append(el('span', 'badge', 'fleet off'));
+              if (!p.self) {
+                var a = el('a', '', p.online ? 'Open its dashboard' : 'its dashboard is off');
+                if (p.online) { a.href = location.protocol + '//' + location.hostname + ':' + p.port + '/'; a.target = '_blank'; a.rel = 'noopener'; }
+                a.style.marginLeft = 'auto';
+                head.append(a);
+              }
+              card.append(head);
+              var rows = p.tickets.slice().sort(function (x, y) { return ORDER.indexOf(x.status) - ORDER.indexOf(y.status) || x.id.localeCompare(y.id); });
+              if (!rows.length) card.append(el('div', 'note-s', 'No tickets yet.'));
+              rows.forEach(function (t) {
+                var r = el('div', '', '');
+                r.style.cssText = 'display:grid;grid-template-columns:3.2em 1fr auto;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line, #8883)';
+                r.append(el('span', 'note-s', t.id));
+                var a2 = el('a', '', t.title); a2.style.color = 'inherit'; a2.href = link(p, t); if (!p.self) { a2.target = '_blank'; a2.rel = 'noopener'; }
+                r.append(a2);
+                var st = el('span', 'badge' + (t.status === 'blocked' || t.status === 'failed' ? ' badge-accent' : ''), (LABEL[t.status] || t.status) + (t.running ? ' · worker running' : ''));
+                r.append(st);
+                card.append(r);
+              });
+              box.append(card);
+            });
+          }
+          function load() {
+            var h = {}; var tk = token(); if (tk) h.Authorization = 'Bearer ' + tk;
+            fetch('/api/wv/projects', { headers: h }).then(function (r) { return r.json(); }).then(render).catch(function () {
+              box.textContent = ''; box.append(el('div', 'note-s', 'Could not read the projects. Check the token in the System panel.'));
+            });
+          }
+          var prev = window.wvNavSync;
+          window.wvNavSync = function (tab) {
+            if (prev) prev(tab);
+            if (timer) { clearInterval(timer); timer = null; }
+            if (tab === 'projects') { load(); timer = setInterval(load, 5000); }
+          };
+        })();
+      </script>
+
