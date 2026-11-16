@@ -50,6 +50,13 @@ sub(/const drafts = tickets\.filter\(\s*\(?t\)? =>\s*String\(t\.status \|\| ''\)
 sub(/onclick: \(\) => jumpToStage\('plan'\)(,?\s*\},\s*'Review')/,
   (m) => `onclick: () => (window.wvReviewDrafts ? window.wvReviewDrafts() : jumpToStage('plan'))` + m[1], 'drafts Review button');
 
+// 4b. Needs you: a ticket of another project that waits for your answer is a Decision row like any other
+sub(/if \(drafts > 0\) rows\.push\(\{ kind: 'drafts', count: drafts \}\);/,
+  `(window.wvAwaiting ? window.wvAwaiting() : []).forEach((f) => {
+          rows.push({ kind: 'decision', ticket: f.id, title: f.title || '', note: '', answer: null });
+        });
+        if (drafts > 0) rows.push({ kind: 'drafts', count: drafts });`, 'foreign decisions');
+
 // 5. the drawer reads other projects' tickets and shows their actions
 sub(/return \(\(stateData && stateData\.tickets\) \|\| \[\]\)\.find\(\(?t\)? => t\.id === id\);(\s*\}\s*function answerFor)/,
   (m) => `return ((stateData && stateData.tickets) || []).find((t) => t.id === id) || (window.wvForeignById ? window.wvForeignById(id) : undefined);` + m[1], 'ticketById');

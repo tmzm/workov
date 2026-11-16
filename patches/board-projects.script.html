@@ -15,6 +15,7 @@
       return out;
     }
     window.wvDraftCount = function (local) { return drafts(local).length; };
+    window.wvAwaiting = function () { return foreign.filter(function (t) { return t.awaiting; }); };
     window.wvReviewDrafts = function () {
       var list = drafts((typeof stateData !== 'undefined' && stateData && stateData.tickets) || []);
       jumpToStage('plan');
@@ -50,7 +51,7 @@
         (d.projects || []).forEach(function (p) {
           if (p.self) { window.__wvSelf = p.name; return; }
           p.tickets.forEach(function (t) {
-            next.push({ id: pre(p.name) + '-' + t.id, title: t.title, status: t.status, mode: t.mode || 'solo', prio: 'P1', runs: 'alongside', deps: [], dependents: [], wvProject: p.name, wvRaw: t.id });
+            next.push({ id: pre(p.name) + '-' + t.id, title: t.title, status: t.status, mode: t.mode || 'solo', prio: 'P1', runs: 'alongside', deps: [], dependents: [], wvProject: p.name, awaiting: !!t.awaiting, wvRaw: t.id });
           });
         });
         var sig = JSON.stringify([names, next.map(function (t) { return [t.id, t.status, t.title]; })]);

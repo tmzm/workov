@@ -58,6 +58,7 @@ def wv_projects():
         root = f["root"]
         cfg = wv_fleet_json(root, "specs/worker-fleet.config.json")
         port = ((cfg.get("dashboard") or {}).get("port")) or 3080
+        pending = {str(x).split("-")[0] for x in (wv_fleet_json(root, "job/router-state.json").get("pendingDecisions") or [])}
         live = {}
         for e in wv_fleet_json(root, "job/router-state.json").get("dispatched", []) or []:
             if isinstance(e, dict) and wv_port_open(e.get("port")):
@@ -65,6 +66,7 @@ def wv_projects():
         rows = wv_fleet_rows(root)
         for r in rows:
             r["running"] = r["id"] in live
+            r["awaiting"] = r["status"] != "done" and r["id"] in pending
         turn = ""
         try:
             tp = Path.home() / ".wv-bin" / "wv-turn.py"
