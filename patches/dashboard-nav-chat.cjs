@@ -140,4 +140,11 @@ console.log('nav + chat tab patch applied');
   const S = '.claude/scripts/dashboard-server.py';
   const s = fs.readFileSync(S, 'utf8');
   if (s.includes("img-src 'self'; connect-src 'self'")) fs.writeFileSync(S, s.replace("img-src 'self'; connect-src 'self'", "img-src 'self' data:; connect-src 'self'"));
+  // the fleet's own selftest pins the policy text, so it learns the same wording
+  const T = '.claude/scripts/selftest.py';
+  if (fs.existsSync(T)) {
+    const t = fs.readFileSync(T, 'utf8');
+    const a = "img-src 'self'; connect-src", b = "img-src 'self' data:; connect-src";
+    if (t.includes(a)) fs.writeFileSync(T, t.replace(a, b));
+  }
 }
