@@ -9,6 +9,7 @@
             Every project on this computer on one board. Only one worker runs at a time, whichever project it comes from;
             the other tickets wait their turn.
           </p>
+          <p id="projects-msg" class="note-s" role="status" style="margin: 0 0 8px"></p>
           <div id="projects-board" aria-live="polite"></div>
         </div>
       </section>
@@ -49,16 +50,29 @@
               if (!rows.length) card.append(el('div', 'note-s', 'No tickets yet.'));
               rows.forEach(function (t) {
                 var r = el('div', '', '');
-                r.style.cssText = 'display:grid;grid-template-columns:3.2em 1fr auto;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line, #8883)';
+                r.style.cssText = 'display:grid;grid-template-columns:3.2em 1fr auto auto;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line, #8883)';
                 r.append(el('span', 'note-s', t.id));
                 var a2 = el('a', '', t.title); a2.style.color = 'inherit'; a2.href = link(p, t); if (!p.self) { a2.target = '_blank'; a2.rel = 'noopener'; }
                 r.append(a2);
                 var st = el('span', 'badge' + (t.status === 'blocked' || t.status === 'failed' ? ' badge-accent' : ''), (LABEL[t.status] || t.status) + (t.running ? ' · worker running' : ''));
                 r.append(st);
+                var act = el('span', '', '');
+                var op = t.status === 'draft' ? ['dispatch', 'Dispatch'] : (t.status === 'in-progress' || t.status === 'ready') ? ['pause', 'Pause'] : (t.status === 'failed' || t.status === 'budget-exceeded') ? ['restart', 'Restart'] : null;
+                if (op) { var b = el('button', 'btn' + (op[0] === 'dispatch' ? ' primary' : ''), op[1]); b.type = 'button'; b.addEventListener('click', function () { run(p, t, op[0], op[1]); }); act.append(b); }
+                r.append(act);
                 card.append(r);
               });
               box.append(card);
             });
+          }
+          function run(p, t, op, label) {
+            var msg = document.getElementById('projects-msg');
+            if (!confirm(label + ' ticket ' + t.id + ' of ' + p.name + '?')) return;
+            var h = { 'Content-Type': 'application/json' }; var tk = token(); if (tk) h.Authorization = 'Bearer ' + tk;
+            fetch('/api/action', { method: 'POST', headers: h, body: JSON.stringify({ action: 'wv_project_action', project: p.name, ticket: t.id, op: op }) })
+              .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+              .then(function (x) { if (msg) msg.textContent = x.ok ? label + ' sent for ticket ' + t.id + ' of ' + p.name + '.' : (x.j && x.j.error) || 'Could not do that.'; load(); })
+              .catch(function () { if (msg) msg.textContent = 'Could not reach the dashboard.'; });
           }
           function load() {
             var h = {}; var tk = token(); if (tk) h.Authorization = 'Bearer ' + tk;

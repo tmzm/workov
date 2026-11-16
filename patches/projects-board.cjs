@@ -60,3 +60,25 @@ const path = require('path');
     console.log('projects board: dashboard page patched');
   }
 }
+
+// ---- actions across projects (dispatch / pause / restart) ----
+{
+  const F = '.claude/scripts/dashboard-server.py';
+  let s = fs.readFileSync(F, 'utf8');
+  if (!s.includes('def wv_project_action')) {
+    const crlf = s.includes('\r\n');
+    s = s.replace(/\r\n/g, '\n');
+    const fn = fs.readFileSync(path.join(__dirname, 'project-action.py.txt'), 'utf8').replace(/\r\n/g, '\n');
+    const a = 'def wv_wanted():';
+    if (!s.includes(a)) throw new Error('anchor missing: def wv_wanted');
+    s = s.replace(a, fn + a);
+    const m = /^WV_ACTIONS = \([^\n]*\)\n/m.exec(s);
+    if (!m) throw new Error('anchor missing: WV_ACTIONS');
+    s = s.replace(m[0], m[0].replace(/"\)\n$/, '", "wv_project_action")\n'));
+    const d = '    if action == "wv_router_restart":';
+    if (!s.includes(d)) throw new Error('anchor missing: wv_router_restart dispatch');
+    s = s.replace(d, '    if action == "wv_project_action":\n        return wv_project_action(req)\n' + d);
+    fs.writeFileSync(F, crlf ? s.replace(/\n/g, '\r\n') : s);
+    console.log('projects board: cross-project actions added');
+  }
+}
