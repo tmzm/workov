@@ -26,6 +26,14 @@ answered() {
   return 1
 }
 active() { working || answered; }
+# One worker at a time across every project on this machine: when another registered fleet (~/.workerov/fleets.json)
+# has a live worker, this cycle may reconcile and answer decisions but must not start a worker.
+busy_note() {
+  local b
+  b="$(python3 -I "$HOME/.wv-bin/wv-busy.py" "$PWD" 2>/dev/null | tr -d '\r')"
+  [ -n "$b" ] && printf ' DISPATCH PAUSED: this computer runs one worker at a time and %s has a worker running. Do not start any worker this cycle (no new dispatch, no new worktree); keep reconciling and answering decisions, and say in your one summary line that dispatch is waiting for %s.' "$b" "$b"
+  return 0
+}
 latest_router_session() {
   python3 -I - "$PWD" <<'PY'
 import os, sqlite3, sys
@@ -45,11 +53,11 @@ FIRST="Run the fleet. Reconcile job/router-state.json first: a worker listed the
 NEXT="Next router cycle: reconcile, read worker heartbeats and results, dispatch ready tickets, verify and land finished ones, answer or record pending decisions. Then end your turn."
 while active; do
   if [ -z "$SID" ]; then
-    opencode run --auto --agent router "$FIRST"
+    opencode run --auto --agent router "$FIRST$(busy_note)"
     SID="$(latest_router_session | tr -d '\r')"
     echo "[router-loop] router session: ${SID:-unknown}"
   else
-    opencode run --auto --agent router --session "$SID" "$NEXT"
+    opencode run --auto --agent router --session "$SID" "$NEXT$(busy_note)"
   fi
   active || break
   sleep "$INTERVAL"
