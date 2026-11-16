@@ -13,7 +13,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-// Per-person settings: ~/.claude/ejadtask.json (see profile.example.json in ejad-fleet).
+// Per-person settings: ~/.claude/task ejad.json (see profile.example.json in ejad-fleet).
 const PROFILE = (() => {
   const file = process.env.EJADTASK_PROFILE || path.join(require('node:os').homedir(), '.claude', 'ejadtask.json');
   if (!fs.existsSync(file)) throw new Error(`missing ${file}: copy profile.example.json from wv-fleet and fill it in`);
@@ -159,7 +159,7 @@ async function ejadHr(t, mrUrl, title) {
   await write('Ejad HR comment', () => req(`${HR}/tasks/${id}/comments`, json('POST', H, { body: `${t.tracker}\nMR: ${mrUrl}`.slice(0, 4000) })));
 }
 
-// A headless delivery pack (.delivery/<task>/, from /ejadtask): same shape as a ticket's delivery folder.
+// A headless delivery pack (.delivery/<task>/, from /task ejad): same shape as a ticket's delivery folder.
 function pack(dir, planeId) {
   const read = (f) => (fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f), 'utf8') : '');
   const sdir = path.join(dir, 'screens');

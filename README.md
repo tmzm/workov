@@ -1,6 +1,6 @@
 # wv-fleet
 
-Claude plans and reviews; cheaper AIs build. One `/ejadtask` command takes a task from Plane through a short plan,
+Claude plans and reviews; cheaper AIs build. One `/task ejad` command takes a task from Plane through a short plan,
 a mockup, the build, the review and the delivery (GitLab MR, Plane, Ejad HR) — with a live dashboard, or headless.
 
 It adds an Workerov layer on top of [worker-fleet](#worker-fleet) (the multi-agent build line with the Fleet Control
@@ -8,7 +8,7 @@ dashboard):
 
 | Piece | What it does |
 |---|---|
-| `commands/ejadtask.md` | The `/ejadtask` Claude Code command: sync Plane ↔ Ejad HR, pick and claim a task, write the plan as a fleet ticket (or a handoff prompt in headless mode), mockup, review, deliver, hours. |
+| `commands/task-modes/ejad.md` | The `/task ejad` Claude Code command: sync Plane ↔ Ejad HR, pick and claim a task, write the plan as a fleet ticket (or a handoff prompt in headless mode), mockup, review, deliver, hours. |
 | `overlay/.claude/scripts/land.cjs` | Token-free delivery: push, GitLab MR (title, description, screenshots, assignee, reviewer), Plane comment + Review, Ejad HR task REVIEW + link + comment. |
 | `overlay/.opencode/plugins/approvals.js` | Permission policy for OpenCode agents: safe work is allowed, dangerous commands are denied, everything else waits for **Allow / Deny** on the dashboard (and a phone push). |
 | `overlay/.claude/scripts/implementers.json` | The headless command lines of the implementer CLIs: OpenCode (default), Copilot, Kilo, Antigravity. |
@@ -33,7 +33,7 @@ Windows notes: the patches make the watchdog, wake watcher and dashboard run on 
 show OpenCode agent sessions in each ticket's Logs tab, and `.claude/scripts/router-loop.sh` keeps the
 OpenCode router cycling without a terminal (`bash .claude/scripts/router-loop.sh`).
 
-Planning on the fleet: `/ejadtask` hands planning to the Claude ticket writer `ejad-planner`
+Planning on the fleet: `/task ejad` hands planning to the Claude ticket writer `ejad-planner`
 (`overlay/.claude/agents/wv-planner.md`, Sonnet), started by
 `node .claude/scripts/plan.cjs <NNN-slug> job/briefs/<NNN>.md`. The ticket shows as `specifying` with the writer
 as its agent, and every planner step streams into `job/logs/<NNN>-planner.log`, which is the ticket's Logs tab.
@@ -43,11 +43,11 @@ The installer:
 2. sets the models (OpenCode Go: router `glm-5.3`, workers `kimi-k2.7-code`, reviewer `deepseek-v4-pro`, the rest
    `glm-5.3-flash`), GitLab landing, 2 workers, app port 4200, $3 per ticket;
 3. adds the Workerov layer and keeps every installed file out of git (`.git/info/exclude`, local only);
-4. copies `/ejadtask` to `~/.claude/commands/` and creates `~/.claude/ejadtask.json` from
+4. copies `/task ejad` to `~/.claude/commands/` and creates `~/.claude/task ejad.json` from
    `profile.example.json` if you have none.
 
 Then, once per person:
-- fill in `~/.claude/ejadtask.json` (your Plane, GitLab and Ejad HR ids, and your reviewers with an optional
+- fill in `~/.claude/task ejad.json` (your Plane, GitLab and Ejad HR ids, and your reviewers with an optional
   `until` date);
 - set the Windows user environment variables `HR_EMAIL`, `HR_PASS` (Ejad HR) and `PLANE_API_KEY` (Plane → Profile
   settings → API tokens). They are read from the environment only and never written anywhere;
@@ -63,7 +63,7 @@ Update: `git pull` here and run `install.sh` again. It is idempotent.
 1. **Start the line** (once per session), in the repo:
    - `opencode --agent router` (or `claude --agent router --name router --permission-mode auto`)
    - the dashboard: `bash .claude/scripts/start-dashboard.sh`, then open `http://localhost:3080`
-2. **Prepare a task** in Claude Code: `/ejadtask` (picks the next unblocked task) or `/ejadtask HR-484`.
+2. **Prepare a task** in Claude Code: `/task ejad` (picks the next unblocked task) or `/task ejad HR-484`.
    Claude syncs Plane and Ejad HR, claims the task, and writes a ticket `specs/tickets/NNN-*/` (`rd.md` with the
    decisions, API contract, states, texts and steps; `eval.md` with pass/fail checks) as **draft**.
 3. **Approve** the ticket on the dashboard (or tell Claude "approve"). The router dispatches a worker in its own
@@ -77,20 +77,20 @@ Update: `git pull` here and run `install.sh` again. It is idempotent.
    - **Question** — a product decision: answer it there.
 5. **Landing is automatic**: tester and reviewer pass → the merger runs `land.cjs` → MR on GitLab, Plane in
    Review, Ejad HR in REVIEW, with screenshots and the summary from the worker's delivery pack.
-6. **Optional final review by Claude**: `/ejadtask HR-484 review`. Findings go back to the ticket as rework and the
+6. **Optional final review by Claude**: `/task ejad HR-484 review`. Findings go back to the ticket as rework and the
    fleet fixes them.
-7. **Hours**: `/ejadtask HR-484 deliver` shows the days worked and logs the hours you give.
+7. **Hours**: `/task ejad HR-484 deliver` shows the days worked and logs the hours you give.
 
-Pick another implementer for a ticket with `/ejadtask HR-484 with copilot` (or `kilo`, `antigravity`): the ticket
+Pick another implementer for a ticket with `/task ejad HR-484 with copilot` (or `kilo`, `antigravity`): the ticket
 gets `## Implementer`, and the worker delegates the build steps to that CLI and still reviews and tests them.
 
 ### Headless mode (no dashboard)
 
-`/ejadtask HR-484 headless`: Claude writes a short plan and a ready-to-paste prompt. Paste it into any AI
+`/task ejad HR-484 headless`: Claude writes a short plan and a ready-to-paste prompt. Paste it into any AI
 (OpenCode, Copilot, Kilo, Antigravity, Codex…). The implementer builds, runs the three reviews, and leaves a delivery
 pack in `.delivery/HR-484/`. Then:
-- `/ejadtask HR-484 review` — Claude checks the work once and gives a fix prompt if needed;
-- `/ejadtask HR-484 deliver` — push, MR, Plane, Ejad HR and hours, in seconds.
+- `/task ejad HR-484 review` — Claude checks the work once and gives a fix prompt if needed;
+- `/task ejad HR-484 deliver` — push, MR, Plane, Ejad HR and hours, in seconds.
 
 ## Configuration
 
@@ -99,7 +99,7 @@ pack in `.delivery/HR-484/`. Then:
 | `specs/worker-fleet.config.json` | models per role, parallel workers, ports, budgets (re-run `python3 .claude/scripts/apply-setup.py --preset custom` after editing) |
 | `.claude/scripts/implementers.json` | command lines of the implementer CLIs (`{prompt}` is replaced) |
 | `.opencode/plugins/approvals.js` | the permission policy (`ALLOW_SHELL`, `DENY_SHELL`) |
-| `~/.claude/ejadtask.json` | your ids and reviewers |
+| `~/.claude/task ejad.json` | your ids and reviewers |
 | phone pushes | `python3 .claude/scripts/apply-setup.py --notify-ntfy <your-secret-topic>` and the ntfy app |
 
 Copilot is limited to the tools listed in `implementers.json`. Kilo and Antigravity have no blanket auto-approve

@@ -1,9 +1,5 @@
----
-description: Prepare a task of the current project for another AI to implement cheaply and well — sync Plane/Ejad HR, pick and claim a task, a short decision plan, mockup, draft MR and an implementation prompt; later review the result and deliver. Implements itself only when I ask.
-argument-hint: "[task id (e.g. ABC-42)] [headless | run | with opencode|copilot|kilo|antigravity | auto | sync | plan only | no mockup | claude mockup | approve | review | deliver | implement | other changes]"
----
 
-# /ejadtask — Claude plans and reviews, another AI implements (Plane + GitLab + Ejad HR)
+# Ejad mode of /task — Claude plans and reviews, another AI implements (Ejad HR + Plane + GitLab)
 
 ## Purpose (read first)
 
@@ -81,7 +77,7 @@ From the repository you are running in:
 
 ## Fixed facts (all projects)
 
-- **Me and my reviewer:** read `~/.claude/ejadtask.json` (fields `planeUserId`, `gitlabUserId`,
+- **Me and my reviewer:** read `~/.claude/task ejad.json` (fields `planeUserId`, `gitlabUserId`,
   `ejadHrEmployeeId`, `reviewers` = `[{ "name", "gitlabUserId", "until": "YYYY-MM-DD" | null }]`, optional
   `planeBaseUrl`, `planeWorkspace`, `ejadHrApi`). The reviewer is the first entry whose `until` is today or later (or
   has none), unless the input says otherwise. If the file is missing, ask me for the values and create it.
@@ -437,7 +433,7 @@ Project: <GitLab path> · Plane <project> · Ejad HR <project>
 <the handoff prompt, in one fenced block>
 ```
 
-Then one line: "When the implementer is done, run `/ejadtask <id> review`; when it's clean, `/ejadtask <id> deliver`."
+Then one line: "When the implementer is done, run `/task ejad <id> review`; when it's clean, `/task ejad <id> deliver`."
 
 At any point: if a dependency, permission, the backend or a failing check blocks progress, stop and ask me instead of
 working around it.

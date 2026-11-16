@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # wv-fleet installer: worker-fleet + the Workerov layer (GitLab MR / Plane / Workerov HR landing, OpenCode Go models,
-# permission approvals, mockup tab, Copilot/Kilo/Antigravity implementers) + the /ejadtask command.
+# permission approvals, mockup tab, Copilot/Kilo/Antigravity implementers) + the /task ejad command.
 #
 #   bash install.sh <target-repo> [--worker-fleet <path-or-git-url>] [--no-command] [--no-setup]
 #
@@ -87,13 +87,13 @@ EXCLUDE="$(git -C "$TARGET" rev-parse --git-common-dir)/info/exclude"
 case "$EXCLUDE" in /*|?:*) ;; *) EXCLUDE="$TARGET/$EXCLUDE" ;; esac
 grep -q "# wv-fleet" "$EXCLUDE" 2>/dev/null || cat "$HERE/exclude.txt" >> "$EXCLUDE"
 
-# 6. the /ejadtask command and the personal profile
+# 6. the /task ejad command and the personal profile
 if [ "$DO_COMMAND" = 1 ]; then
   mkdir -p "$HOME/.claude/commands"
-  cp "$HERE/commands/ejadtask.md" "$HOME/.claude/commands/ejadtask.md"
+  mkdir -p "$HOME/.claude/task-modes"; cp "$HERE/commands/task-modes/ejad.md" "$HOME/.claude/task-modes/ejad.md"; rm -f "$HOME/.claude/commands/task ejad.md"
   cp "$HERE/commands/task.md" "$HOME/.claude/commands/task.md"; mkdir -p "$HOME/.claude/task-profiles"
-  [ -f "$HOME/.claude/ejadtask.json" ] || { cp "$HERE/profile.example.json" "$HOME/.claude/ejadtask.json"; NEED_PROFILE=1; }
-  # The approvals plugin, for /ejadtask's headless runs in any repo. Inactive unless EJAD_APPROVALS is set (or the
+  [ -f "$HOME/.claude/task ejad.json" ] || { cp "$HERE/profile.example.json" "$HOME/.claude/task ejad.json"; NEED_PROFILE=1; }
+  # The approvals plugin, for /task ejad's headless runs in any repo. Inactive unless EJAD_APPROVALS is set (or the
   # repo has worker-fleet), so ordinary OpenCode sessions are untouched.
   mkdir -p "$HOME/.config/opencode/plugins"
   cp "$HERE/overlay/.opencode/plugins/approvals.js" "$HOME/.config/opencode/plugins/approvals.js"
@@ -107,7 +107,7 @@ fi
 
 echo
 echo "wv-fleet installed into $TARGET"
-[ "${NEED_PROFILE:-0}" = 1 ] && echo "  -> fill in ~/.claude/ejadtask.json (your Plane / GitLab / Ejad HR ids and reviewers)"
+[ "${NEED_PROFILE:-0}" = 1 ] && echo "  -> fill in ~/.claude/task ejad.json (your Plane / GitLab / Ejad HR ids and reviewers)"
 echo "  -> set Windows user env vars HR_EMAIL, HR_PASS, PLANE_API_KEY; log in with glab for your GitLab host"
 echo "  -> run: $PY3 .claude/scripts/selftest.py   (inside the target repo)"
 echo "  -> read README.md in wv-fleet for the daily workflow"

@@ -1,6 +1,6 @@
 ---
 name: wv-planner
-description: "Writes one Ejad fleet ticket (rd.md + eval.md) from a task brief, as the fleet's ticket writer: specifying row and heartbeat on the board, the /ejadtask Plan standard for the content. Started by .claude/scripts/ejad-plan.cjs; its work streams into the ticket's Logs tab."
+description: "Writes one Ejad fleet ticket (rd.md + eval.md) from a task brief, as the fleet's ticket writer: specifying row and heartbeat on the board, the /task ejad Plan standard for the content. Started by .claude/scripts/ejad-plan.cjs; its work streams into the ticket's Logs tab."
 model: sonnet
 ---
 
@@ -15,7 +15,7 @@ You are the **ticket writer** for one ticket of this worker-fleet repo. You plan
 1. `CLAUDE.md` (the project constitution; it wins over everything here).
 2. `.claude/skills/write-tickets/SKILL.md`: **Writer visibility** (reserve, heartbeat, finish), the rd.md and eval.md
    templates, and the board rules.
-3. `~/.claude/commands/ejadtask.md`: the sections **Plan standard** (what goes in, what stays out, the sections, the
+3. `~/.claude/task-modes/ejad.md`: the sections **Plan standard** (what goes in, what stays out, the sections, the
    Review procedures block) and **Fleet mode** (the extra rd.md lines and sections).
 4. The newest finished ticket under `specs/tickets/` as a style model.
 5. Only the code, backend source (`git show origin/<branch>:<path>`) or Swagger parts the endpoints of this task use.

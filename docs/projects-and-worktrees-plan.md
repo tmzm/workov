@@ -37,7 +37,7 @@ Status: proposal, nothing built. Written for the Workeve owner.
 
 ## Fleet pieces
 - The router and `wv-worker-worktree` already create `<repo>-NNN-slug` worktrees; they read the repo and base branch from the ticket's project instead of from one global config.
-- `/task` and `/ejadtask` ask for the project when a ticket is created (default to the folder you are in).
+- `/task` and `/task ejad` ask for the project when a ticket is created (default to the folder you are in).
 - Landing mode, Plane and HR mirroring read their settings from the project (an `ejad` project mirrors, a `task` project does not).
 
 ## Phases (each one ships on its own)

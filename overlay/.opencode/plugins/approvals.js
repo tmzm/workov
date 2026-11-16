@@ -84,7 +84,7 @@ export default define({
   id: 'wv-approvals',
   async setup(ctx) {
     const root = mainRoot(process.cwd());
-    // Active in a worker-fleet repo, or when /ejadtask starts the provider (EJAD_APPROVALS=1, or =auto to allow
+    // Active in a worker-fleet repo, or when /task ejad starts the provider (EJAD_APPROVALS=1, or =auto to allow
     // everything that is not denied). Ordinary OpenCode sessions elsewhere are untouched.
     const mode = process.env.WV_APPROVALS || (fs.existsSync(path.join(root, 'specs', 'worker-fleet.config.json')) ? '1' : '');
     if (!mode) return;

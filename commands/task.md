@@ -1,5 +1,5 @@
 ---
-description: Prepare and run a task of any project (Ejad, The Inspiring Woman, Personal, or any other) on the worker fleet. Ejad mode is exactly /ejadtask; other modes use a profile file that is created on first use.
+description: Prepare and run a task of any project (Ejad, The Inspiring Woman, Personal, or any other) on the worker fleet. Ejad mode follows the Ejad rules file; other modes use a profile file that is created on first use.
 argument-hint: "[ejad | inspiring-women | personal | <profile name>] [task id or description] [headless | with <cli> | review | deliver | profile | other changes]"
 ---
 
@@ -22,9 +22,8 @@ The first word of my input names the mode. When it does not, decide from the cur
 
 ## 2. Ejad mode
 
-Read `~/.claude/commands/ejadtask.md` in full and follow it exactly, passing the rest of my input as its input. Nothing
+Read `~/.claude/task-modes/ejad.md` in full and follow it exactly, passing the rest of my input as its input. Nothing
 about Ejad work changes: Ejad HR first (then the Plane mirror), GitLab MR, reviewers, hours, and every rule in that file stay as they are.
-`/ejadtask` keeps working as the same thing.
 
 ## Ticket flow (every mode)
 
@@ -38,7 +37,7 @@ The fleet asks me at three points, whatever the mode:
    ticket ends as done and nothing else is touched.
 
 In `ejad` mode the trackers are **Ejad HR first**: Ejad HR (live) is the source of truth, tasks come from it, and when
-it and Plane differ only the Plane mirror is brought into line with it, never the reverse (see `/ejadtask`).
+it and Plane differ only the Plane mirror is brought into line with it, never the reverse (see `~/.claude/task-modes/ejad.md`).
 
 ## 3. Every other mode: the profile
 
@@ -64,7 +63,7 @@ Steps:
    `bash <workerov-fleet>/install.sh <repo>` (it only adds the fleet; the Ejad layer's Plane/HR parts stay unused for
    non-Ejad profiles) and wait for my yes.
 3. Get the task: from the profile's task source (an id), or from my words if the source is `none` or I typed a
-   description. Create the ticket on the repo's board exactly as `/ejadtask` does (rd.md with the short plan, tests
+   description. Create the ticket on the repo's board exactly as the Ejad mode does (rd.md with the short plan, tests
    first, small steps that copy existing files, the board row), but skip every Plane, Ejad HR and hours step. Use the
    profile's branch name, commit style and checks wherever the Ejad flow names its own.
 4. The worker builds, tester and reviewer gate it, as on any fleet ticket. I watch it on the dashboard.
