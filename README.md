@@ -138,6 +138,6 @@ The installer adds three guards so a small machine is not run out of memory:
 exposed; `on` sets it back to `cloudflared` (a configured named tunnel and hostname are kept) and starts the tunnel.
 While the provider is `local`, neither the app nor `start-dashboard.sh` opens a tunnel.
 
-`overlay/wv-bin/` holds `.cmd` shims for `pnpm`, `npm`, `npx` and `ng` (all calling `wv-wrap.sh`), installed to `~/.wv-bin` and put first on `PATH` by `router-loop.sh`. The agents run their commands in PowerShell, so the shims are `.cmd` files: an extensionless file on `PATH` makes Windows ask which app should open it. A
+`wv-bin/` holds `.cmd` shims for `pnpm`, `npm`, `npx` and `ng` (all calling `wv-wrap.sh`), installed to `~/.wv-bin` and put first on `PATH` by `router-loop.sh`. The agents run their commands in PowerShell, so the shims are `.cmd` files: an extensionless file on `PATH` makes Windows ask which app should open it. A
 heavy subcommand (`install`, `test`, `lint`, `build`, `format`, `e2e`) goes through `heavy-run.sh`, so only one runs at a
 time on the machine even when an agent forgets the rule. Other commands pass straight through to the real tool.

@@ -102,7 +102,7 @@ if [ "$DO_COMMAND" = 1 ]; then
   cp "$HERE/overlay/.claude/scripts/land.cjs" "$HOME/.claude/wv-fleet/land.cjs"
   # pnpm/npm wrappers: heavy commands (test, lint, build, install) wait their turn machine-wide. router-loop.sh puts this
   # folder first on PATH for the agents it starts.
-  mkdir -p "$HOME/.wv-bin" && cp "$HERE"/overlay/wv-bin/* "$HOME/.wv-bin/" && chmod +x "$HOME/.wv-bin/"*
+  mkdir -p "$HOME/.wv-bin" && cp "$HERE"/wv-bin/* "$HOME/.wv-bin/" && chmod +x "$HOME/.wv-bin/"*
 fi
 
 echo
