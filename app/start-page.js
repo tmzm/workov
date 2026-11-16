@@ -33,7 +33,7 @@ function rows(r) {
 }
 async function launch() {
   if (launching) return; launching = true; clearInterval(timer);
-  $('title').textContent = 'Starting Workeve'; $('lead').textContent = 'Starting the dashboard, router and phone link…'; $('bar').hidden = false;
+  $('title').textContent = 'Starting ' + window.APP_NAME; $('lead').textContent = 'Starting the dashboard, router and phone link…'; $('bar').hidden = false;
   const r = await fleetSetup.launch();
   if (r && r.ok) return; // the window is already moving to the dashboard
   launching = false; $('bar').hidden = true; $('lead').textContent = 'The dashboard did not start in time. Check Python and the fleet folder, then try again.'; $('foot').hidden = false; timer = setInterval(check, 4000);

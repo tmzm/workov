@@ -20,7 +20,7 @@
     es.onmessage = (e) => { try { const [k, d] = JSON.parse(e.data); cb(k, d); } catch { /* ignore a broken frame */ } };
     es.onerror = () => cb('conn', { ok: false });
     es.onopen = () => cb('conn', { ok: true });
-    window.addEventListener('message', (e) => { if (e.origin === location.origin && e.data && e.data.type === 'ejad-theme') cb('theme', e.data.data); });
+    window.addEventListener('message', (e) => { if (e.origin === location.origin && e.data && e.data.type === 'wv-theme') cb('theme', e.data.data); });
   };
   window.fleetChat = api;
 })();

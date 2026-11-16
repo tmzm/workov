@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" data-theme="tmzm" data-mode="dark">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>About Workerov</title>
+<script src="chat-boot.js"></script>
+<link rel="stylesheet" href="chat.css">
+<style>
+body{display:block;overflow:auto}
+.wrap{max-width:460px;margin:0 auto;padding:40px 24px;text-align:center}
+.logo{width:72px;height:72px;border-radius:18px;margin:0 auto 18px}
+h1{margin:0 0 2px;font-size:1.6em}
+.ver{color:var(--faint);font-size:13px;margin-bottom:22px}
+ul{text-align:right;list-style:none;padding:0;margin:0 0 22px;display:inline-block}
+li{padding:5px 0;color:var(--dim);font-size:14px}
+li b{color:var(--text)}
+.credit{border-top:1px solid var(--line);padding-top:16px;color:var(--faint);font-size:13px;line-height:1.7}
+.credit b{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="logo" role="img" aria-label="Workerov"></span>
+  <h1 id="brandTitle">Workerov</h1>
+  <script>document.getElementById('brandTitle').textContent = window.APP_NAME; document.querySelector('.logo').setAttribute('aria-label', window.APP_NAME); document.title = 'About ' + window.APP_NAME;</script>
+  <div class="ver" id="ver">version —</div>
+  <ul>
+    <li><b>Board</b> — tickets build themselves with AI</li>
+    <li><b>Chat</b> — talk to Claude, right from the app</li>
+    <li><b>Providers</b> — connect Claude, Google, NVIDIA and more</li>
+    <li><b>Timeline logs</b> — every step the AI took, laid out clearly</li>
+  </ul>
+  <div class="credit">Built by<br><b>Tareq Al Mozayek &amp; Tawfiq</b></div>
+</div>
+<script src="about-page.js"></script>
+</body>
+</html>

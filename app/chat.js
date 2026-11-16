@@ -2,6 +2,8 @@
 // one collapsible row per tool call (diffs for edits, output for commands), a live plan, and Allow/Deny cards.
 'use strict';
 const $ = (id) => document.getElementById(id);
+if ($('brandText')) $('brandText').textContent = window.APP_NAME + ' Chat';
+document.title = window.APP_NAME + ' Chat';
 const log = $('log'), box = $('box'), scroller = $('scroll');
 const ICON = { Read: 'file', Edit: 'edit', MultiEdit: 'edit', Write: 'edit', NotebookEdit: 'edit', Bash: 'term', Grep: 'search', Glob: 'search', WebSearch: 'search', WebFetch: 'search' };
 let files = [], cmds = [], busy = false, stick = true, turn = null, live = {}, tools = {}, streamed = new Set(), todoCard = null, menuIdx = 0, thinkCount = 0;
@@ -289,8 +291,10 @@ document.addEventListener('click', (e) => { if (!$('pop').contains(e.target) && 
 function choose(anchor, list, cur, apply) {
   pop(anchor, (p) => { for (const [id, name, desc] of list) { const it = h('div', 'it' + (id === cur ? ' cur' : ''), null, p); it.tabIndex = 0; h('b', null, name, it); h('span', null, desc, it); const go = () => { closePop(); apply(id); }; it.onclick = go; it.onkeydown = (ev) => { if (ev.key === 'Enter') go(); }; } });
 }
-const openModes = () => choose($('modeChip'), MODES, curMode, (m) => fleetChat.setPermissionMode(m));
-const openModels = () => choose($('modelChip'), MODELS, curModel, (m) => fleetChat.setModel(m));
+// Switching mode or model while a turn is streaming is accepted by the SDK but only confirmed once that turn ends
+// (its own 'state' broadcast arrives late), so the chip is painted right away instead of waiting for that echo.
+const openModes = () => choose($('modeChip'), MODES, curMode, (m) => { curMode = m; const d = MODES.find((x) => x[0] === m) || MODES[0]; $('modeText').textContent = d[1]; $('modeChip').className = 'chip2 mode-' + m; fleetChat.setPermissionMode(m); });
+const openModels = () => choose($('modelChip'), MODELS, curModel, (m) => { curModel = m; $('modelText').textContent = (MODELS.find((x) => x[0] === m) || MODELS[0])[1]; fleetChat.setModel(m); });
 const THINK = [[null, 'Thinking: normal', 'Claude decides how much to think'], [0, 'Thinking: off', 'Fastest, no extended thinking'], [8000, 'Thinking: deeper', 'Up to 8k thinking tokens'], [31999, 'Thinking: maximum', 'Up to 32k thinking tokens, slower']];
 let curThink = null;
 $('thinkChip').onclick = () => choose($('thinkChip'), THINK.map(([v, n, d]) => [String(v), n, d]), String(curThink), (v) => { curThink = v === 'null' ? null : Number(v); $('thinkText').textContent = THINK.find((x) => String(x[0]) === v)[1]; fleetChat.thinking(curThink); });
@@ -317,7 +321,7 @@ $('ctxChip').onclick = async () => {
     const cp = h('div', 'it', null, p); h('b', null, 'Compact this chat', cp); h('span', null, 'Summarize it to free up context', cp); cp.onclick = () => { closePop(); box.value = '/compact'; send(); };
   });
 };
-box.addEventListener('keydown', (e) => { if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); const i = MODES.findIndex((x) => x[0] === curMode); fleetChat.setPermissionMode(MODES[(i + 1) % MODES.length][0]); } });
+box.addEventListener('keydown', (e) => { if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); const i = MODES.findIndex((x) => x[0] === curMode), m = MODES[(i + 1) % MODES.length]; curMode = m[0]; $('modeText').textContent = m[1]; $('modeChip').className = 'chip2 mode-' + m[0]; fleetChat.setPermissionMode(m[0]); } });
 $('new').onclick = newChat;
 $('dash').onclick = () => fleetChat.openDashboard();
 $('folder').onclick = async (e) => {

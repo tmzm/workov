@@ -5,6 +5,7 @@
   if (!/^(andon|cyberpunk|tmzm)$/.test(theme)) theme = 'tmzm';
   if (mode !== 'dark' && mode !== 'light') mode = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   var q = new URLSearchParams(location.search);
+  window.APP_NAME = /^[^<>&"']{1,40}$/.test(q.get('name') || '') ? q.get('name') : 'Workerov';
   if (q.get('web') === '1') document.write('<script src="chat-web.js"><\/script>');
   if (q.get('embedded') === '1') {
     r.classList.add('embedded');

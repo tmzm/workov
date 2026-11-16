@@ -18,14 +18,14 @@ fs.renameSync(path.join(out, 'electron.exe'), path.join(out, 'Workeve.exe'));
 fs.rmSync(path.join(out, 'resources', 'default_app.asar'), { force: true });
 const app = path.join(out, 'resources', 'app');
 fs.mkdirSync(app, { recursive: true });
-for (const f of ['main.js', 'chat-engine.js', 'preload.js', 'shell-preload.js', 'setup.js', 'start.html', 'start-page.js', 'chat.html', 'chat.css', 'chat.js', 'chat-md.js', 'chat-boot.js', 'package.json', 'icon.png']) fs.copyFileSync(f, path.join(app, f));
+for (const f of ['main.js', 'chat-engine.js', 'chat-bridge.js', 'chat-web.js', 'preload.js', 'shell-preload.js', 'setup.js', 'start.html', 'start-page.js', 'chat.html', 'chat.css', 'chat.js', 'chat-md.js', 'chat-boot.js', 'package.json', 'icon.png']) fs.copyFileSync(f, path.join(app, f));
 
 (async () => {
   try {
     const rcedit = require('rcedit');
     await (rcedit.rcedit || rcedit)(path.join(out, 'Workeve.exe'), {
       icon: 'icon.ico',
-      'version-string': { ProductName: 'Workeve', FileDescription: 'Workeve', CompanyName: 'Ejad', OriginalFilename: 'Workeve.exe' },
+      'version-string': { ProductName: 'Workeve', FileDescription: 'Workeve', CompanyName: 'Workerov', OriginalFilename: 'Workeve.exe' },
     });
     console.log('icon and version info stamped on the exe');
   } catch (e) {

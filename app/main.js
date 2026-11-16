@@ -14,14 +14,19 @@ const fs = require('node:fs');
 const http = require('node:http');
 const { spawn, spawnSync } = require('node:child_process');
 
+// The one place the app's own display name comes from: package.json's "productName" (also what electron-builder
+// names the installer, the Start Menu shortcut and the Apps list entry — change it there, nowhere else, then rebuild).
+const PKG = require('./package.json');
+const APP_NAME = PKG.productName || 'Workerov';
 const SELFTEST = process.argv.includes('--selftest');
 const START_HIDDEN = process.argv.includes('--hidden');
-// EJAD_TEST_DIR gives tests their own data, config and instance lock, so they never touch an installed copy
-if (process.env.EJAD_TEST_DIR) app.setPath('userData', path.join(process.env.EJAD_TEST_DIR, 'userData'));
-const CFG_FILE = path.join(process.env.EJAD_TEST_DIR || app.getPath('appData'), 'Workeve', 'config.json');
-const DEFAULTS = { fleet: 'E:\\Projects\\Ejad\\dashboard-fleet', autostart: true };
+// WV_TEST_DIR gives tests their own data, config and instance lock, so they never touch an installed copy
+if (process.env.WV_TEST_DIR) app.setPath('userData', path.join(process.env.WV_TEST_DIR, 'userData'));
+// This folder name stays fixed across rebrands on purpose, so settings and logins are never lost on a rename.
+const CFG_FILE = path.join(process.env.WV_TEST_DIR || app.getPath('appData'), 'Workeve', 'config.json');
+const DEFAULTS = { fleet: path.join(require('os').homedir(), 'Workerov-fleet'), autostart: true };
 
-// the app used to be called Ejad Fleet: keep its settings
+// the app used to be called Workerov Fleet: keep its settings
 const OLD_CFG = path.join(path.dirname(path.dirname(CFG_FILE)), 'EjadFleet', 'config.json');
 if (!fs.existsSync(CFG_FILE) && fs.existsSync(OLD_CFG)) { try { fs.mkdirSync(path.dirname(CFG_FILE), { recursive: true }); fs.copyFileSync(OLD_CFG, CFG_FILE); } catch { /* starts fresh */ } }
 let cfg = { ...DEFAULTS };
@@ -34,6 +39,10 @@ let win = null, tray = null, quitting = false, lastStart = 0, lastNotified = '',
 function fleetJson(rel) { try { return JSON.parse(fs.readFileSync(path.join(cfg.fleet, rel), 'utf8')); } catch { return null; } }
 function port() { const c = fleetJson('specs/worker-fleet.config.json'); return (c && c.dashboard && Number(c.dashboard.port)) || 3080; }
 function token() { const a = fleetJson('job/dashboard-auth.json'); return a && a.authToken || ''; }
+// This window is the owner's own: hand it the full-access token through the dashboard's own one-time bootstrap
+// (?token=... -> stored in localStorage, then stripped from the URL by the page itself), so it opens already signed
+// in instead of showing PIN REQUIRED. Never done for a remote visitor — this only ever runs inside this app.
+function dashboardUrl() { const t = token(); return `http://127.0.0.1:${port()}/` + (t ? `?token=${encodeURIComponent(t)}` : ''); }
 function gitBash() { return ['C:\\Program Files\\Git\\bin\\bash.exe', 'C:\\Program Files (x86)\\Git\\bin\\bash.exe'].find((p) => fs.existsSync(p)) || null; }
 
 function prerequisites() {
@@ -73,8 +82,25 @@ function startServices() {
   if (!bash || !fs.existsSync(path.join(cfg.fleet, '.claude', 'scripts', 'start-dashboard.sh'))) return;
   lastStart = Date.now();
   fs.mkdirSync(path.dirname(CFG_FILE), { recursive: true });
-  const log = fs.openSync(path.join(path.dirname(CFG_FILE), 'launcher.log'), 'a');
-  spawn(bash, ['.claude/scripts/start-dashboard.sh'], { cwd: cfg.fleet, detached: true, stdio: ['ignore', log, log], windowsHide: true }).unref();
+  const logPath = path.join(path.dirname(CFG_FILE), 'launcher.log');
+  const stamp = () => new Date().toISOString();
+  const append = (line) => { try { fs.appendFileSync(logPath, `[${stamp()}] ${line}\n`); } catch { /* best effort */ } };
+  append('spawning: ' + bash + ' .claude/scripts/start-dashboard.sh (cwd ' + cfg.fleet + ')');
+  // Windows note: `detached: true` with inherited raw-fd stdio can silently fail to actually run the child (no error,
+  // no exit, no output — observed on this machine). Not detaching is fine here: we .unref() right away, so this
+  // process exiting never waits on the child; windowsHide keeps it from flashing a console.
+  let child;
+  try {
+    child = spawn(bash, ['.claude/scripts/start-dashboard.sh'], { cwd: cfg.fleet, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  } catch (e) {
+    append('spawn threw: ' + String((e && e.message) || e));
+    return;
+  }
+  child.stdout.on('data', (d) => append('[out] ' + String(d).trimEnd()));
+  child.stderr.on('data', (d) => append('[err] ' + String(d).trimEnd()));
+  child.on('error', (e) => append('spawn error event: ' + String((e && e.message) || e)));
+  child.on('exit', (code, sig) => append(`exited: code=${code} signal=${sig}`));
+  child.unref();
 }
 
 // ---------- status, tray, notifications ----------
@@ -91,15 +117,15 @@ async function watchTickets(o) {
   const now = new Set((o && o.working) || []);
   if (wasWorking) for (const id of wasWorking) if (!now.has(id)) toast('Ticket ' + id + ' stopped building', 'Open the board to see whether it finished or needs you.');
   wasWorking = now;
-  const f = await get('/api/ejad/failover'), p = f.json && f.json.pending;
+  const f = await get('/api/wv/failover'), p = f.json && f.json.pending;
   const key = p ? JSON.stringify(p).slice(0, 80) : '';
   if (key && key !== lastPending) toast('Model switch waiting for you', 'The failover watchdog suggests a change. Open Providers to apply or dismiss it.');
   lastPending = key;
 }
 async function poll() {
-  const r = await get('/api/ejad/router');
+  const r = await get('/api/wv/router');
   if (r.status !== 200 || !r.json) { status = { text: 'dashboard not running: starting it…', ok: false }; startServices(); updateTray(); return false; }
-  const o = await get('/api/ejad/overview');
+  const o = await get('/api/wv/overview');
   const working = (o.json && o.json.working) || [];
   const issue = o.json && o.json.issue;
   watchTickets(o.json).catch(() => {});
@@ -110,27 +136,36 @@ async function poll() {
   updateTray();
   return true;
 }
-function open() { if (!win) createWindow(); win.show(); win.focus(); }
+let hiddenAt = 0;
+const STALE_MS = 2 * 60 * 1000; // a window left in the tray this long reloads before it's shown again
+function open() {
+  if (!win) { createWindow(); win.show(); win.focus(); return; }
+  const stale = hiddenAt && Date.now() - hiddenAt > STALE_MS;
+  if (stale && /^http:\/\/127\.0\.0\.1:/.test(win.webContents.getURL())) win.webContents.reloadIgnoringCache();
+  hiddenAt = 0;
+  win.show(); win.focus();
+}
 function menu() {
   return Menu.buildFromTemplate([
-    { label: 'Open Workeve', click: open },
+    { label: 'Open ' + APP_NAME, click: open },
     { label: 'Open chat in its own window', click: openChat },
     { label: status.text, enabled: false },
     { type: 'separator' },
-    { label: 'Pause all', click: () => act('ejad_pause_all') },
-    { label: 'Start fleet', click: () => act('ejad_fleet_start') },
-    { label: 'Restart router (fresh session)', click: () => act('ejad_router_restart') },
+    { label: 'Pause all', click: () => act('wv_pause_all') },
+    { label: 'Start fleet', click: () => act('wv_fleet_start') },
+    { label: 'Restart router (fresh session)', click: () => act('wv_router_restart') },
     { type: 'separator' },
     { label: 'Start with Windows', type: 'checkbox', checked: !!cfg.autostart, click: (i) => { cfg.autostart = i.checked; saveCfg(); applyLoginItem(); } },
     { label: 'Choose fleet folder…', click: chooseFleet },
     { label: 'Chat from the phone link', type: 'checkbox', checked: cfg.remoteChat !== false, click: (i) => { cfg.remoteChat = i.checked; saveCfg(); } },
     { label: 'Setup & checks…', click: openSetup },
+    { label: 'About ' + APP_NAME, click: openAbout },
     { type: 'separator' },
     { label: 'Quit (leaves the fleet running)', click: () => { quitting = true; app.quit(); } },
   ]);
 }
-function updateTray() { if (!tray) return; tray.setToolTip('Workeve: ' + status.text); tray.setContextMenu(menu()); }
-function applyLoginItem() { if (process.env.EJAD_NO_AUTOSTART) return; if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!cfg.autostart, args: ['--hidden'] }); }
+function updateTray() { if (!tray) return; tray.setToolTip(APP_NAME + ': ' + status.text); tray.setContextMenu(menu()); }
+function applyLoginItem() { if (process.env.WV_NO_AUTOSTART) return; if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!cfg.autostart, args: ['--hidden'] }); }
 async function chooseFleet(parent) {
   const r = await dialog.showOpenDialog(parent || undefined, { title: 'Choose the fleet folder (it contains specs/worker-fleet.config.json)', properties: ['openDirectory'], defaultPath: cfg.fleet });
   if (!r.canceled && r.filePaths[0]) { cfg.fleet = r.filePaths[0]; saveCfg(); lastStart = 0; poll(); }
@@ -153,7 +188,7 @@ function ensureChatView() {
   if (chatView) return chatView;
   chatView = new WebContentsView({ webPreferences: CHAT_PREFS() });
   const bg = (lastTheme && lastTheme.tokens.bg) || '#0f0e0b'; chatView.setBackgroundColor(bg); // no white flash before the page paints
-  const query = { embedded: '1' }; if (lastTheme) { query.theme = lastTheme.style; query.mode = lastTheme.mode; if (/^#[0-9a-f]{3,8}$/i.test(bg)) query.bg = bg; }
+  const query = { embedded: '1', name: APP_NAME }; if (lastTheme) { query.theme = lastTheme.style; query.mode = lastTheme.mode; if (/^#[0-9a-f]{3,8}$/i.test(bg)) query.bg = bg; }
   lockChat(chatView.webContents); chatView.webContents.loadFile(path.join(__dirname, 'chat.html'), { query });
   chatView.webContents.on('did-finish-load', () => { if (lastTheme) chatView.webContents.send('chat:event', 'theme', lastTheme); });
   return chatView;
@@ -163,12 +198,12 @@ function fromDashboard(e) { return !!win && e.sender === win.webContents && e.se
 function openChat() {
   if (chatWin) { chatWin.show(); chatWin.focus(); return; }
   chatWin = new BrowserWindow({
-    width: 1100, height: 820, minWidth: 420, minHeight: 500, backgroundColor: '#0f0e0b', title: 'Workeve Chat', autoHideMenuBar: true,
+    width: 1100, height: 820, minWidth: 420, minHeight: 500, backgroundColor: '#0f0e0b', title: APP_NAME + ' Chat', autoHideMenuBar: true,
     icon: path.join(__dirname, 'icon.png'), webPreferences: CHAT_PREFS(),
   });
   lockChat(chatWin.webContents);
   chatWin.on('closed', () => { chatWin = null; });
-  chatWin.loadFile(path.join(__dirname, 'chat.html'));
+  chatWin.loadFile(path.join(__dirname, 'chat.html'), { query: { name: APP_NAME } });
 }
 // inside the installed app the bundled Claude binary sits next to app.asar, not inside it
 function bundledClaude() { try { const p = require.resolve('@anthropic-ai/claude-agent-sdk-win32-x64/claude.exe').replace('app.asar', 'app.asar.unpacked'); return fs.existsSync(p) ? p : ''; } catch { return ''; } }
@@ -234,7 +269,7 @@ function setupChat() {
 }
 
 // ---------- start screen: checks, onboarding and launch all happen in the main window ----------
-function openSetup() { if (!win) createWindow(); win.loadFile(path.join(__dirname, 'start.html'), { query: { force: '1' } }); open(); }
+function openSetup() { if (!win) createWindow(); win.loadFile(path.join(__dirname, 'start.html'), { query: { force: '1', name: APP_NAME } }); open(); }
 function setupIpc() {
   const ok = (e) => win && e.sender === win.webContents && e.senderFrame && /\/start\.html/.test(e.senderFrame.url);
   ipcMain.handle('setup:checks', (e) => (ok(e) ? setup.checks(cfg) : null));
@@ -245,24 +280,36 @@ function setupIpc() {
   ipcMain.handle('setup:launch', async (e) => {
     if (!ok(e)) return { ok: false };
     lastStart = 0; startServices();
-    for (let n = 0; n < 60; n++) { if (await poll()) { if (win) win.loadURL(`http://127.0.0.1:${port()}/`); return { ok: true }; } if (n % 10 === 9) { lastStart = 0; startServices(); } await new Promise((r) => setTimeout(r, 1500)); }
+    for (let n = 0; n < 60; n++) { if (await poll()) { if (win) win.loadURL(dashboardUrl()); return { ok: true }; } if (n % 10 === 9) { lastStart = 0; startServices(); } await new Promise((r) => setTimeout(r, 1500)); }
     return { ok: false };
   });
+}
+
+// ---------- about ----------
+let aboutWin = null;
+ipcMain.handle('about:version', (e) => (aboutWin && e.sender === aboutWin.webContents ? require('./package.json').version : null));
+function openAbout() {
+  if (aboutWin) { aboutWin.show(); aboutWin.focus(); return; }
+  aboutWin = new BrowserWindow({ width: 380, height: 520, resizable: false, backgroundColor: '#0f0e0b', title: 'About ' + APP_NAME, autoHideMenuBar: true, icon: path.join(__dirname, 'icon.png'),
+    webPreferences: { preload: path.join(__dirname, 'about-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  lockChat(aboutWin.webContents);
+  aboutWin.on('closed', () => { aboutWin = null; });
+  aboutWin.loadFile(path.join(__dirname, 'about.html'), { query: { name: APP_NAME } });
 }
 
 // ---------- the window ----------
 function createWindow() {
   win = new BrowserWindow({
-    width: 1360, height: 900, minWidth: 420, minHeight: 600, backgroundColor: '#0f0e0b', title: 'Workeve', autoHideMenuBar: true, show: false,
+    width: 1360, height: 900, minWidth: 420, minHeight: 600, backgroundColor: '#0f0e0b', autoHideMenuBar: true, show: false,
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'shell-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false },
   });
   const local = `http://127.0.0.1:${port()}/`;
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(local) && !url.startsWith('file://')) { e.preventDefault(); if (/^https:\/\//.test(url)) shell.openExternal(url); } });
-  win.on('close', (e) => { if (!quitting) { e.preventDefault(); win.hide(); } });
+  win.on('close', (e) => { if (!quitting) { e.preventDefault(); win.hide(); hiddenAt = Date.now(); } });
   win.on('closed', () => { win = null; chatViewShown = false; });
-  win.loadFile(path.join(__dirname, 'start.html'));
+  win.loadFile(path.join(__dirname, 'start.html'), { query: { name: APP_NAME } });
   win.once('ready-to-show', () => { if (!START_HIDDEN) win.show(); });
 }
 
@@ -274,7 +321,7 @@ app.on('window-all-closed', () => { /* stays in the tray */ });
 app.whenReady().then(async () => {
   if (SELFTEST) {
     const pre = prerequisites(); startServices();
-    let r = null; for (let i = 0; i < 12 && !(r && r.status === 200); i++) { await new Promise((x) => setTimeout(x, 2500)); r = await get('/api/ejad/router'); }
+    let r = null; for (let i = 0; i < 12 && !(r && r.status === 200); i++) { await new Promise((x) => setTimeout(x, 2500)); r = await get('/api/wv/router'); }
     const ok = !!(r && r.status === 200);
     const out = JSON.stringify({ selftest: true, fleet: cfg.fleet, port: port(), prerequisites: pre.map((p) => `${p.ok ? 'ok ' : 'MISSING '}${p.name}`), dashboard: ok ? 'reachable' : 'NOT reachable', router: ok ? r.json.state : null, tokenFound: !!token() }, null, 1);
     fs.mkdirSync(path.dirname(CFG_FILE), { recursive: true }); fs.writeFileSync(path.join(path.dirname(CFG_FILE), 'selftest.json'), out); console.log(out);
@@ -285,7 +332,7 @@ app.whenReady().then(async () => {
   tray.on('click', open); tray.on('double-click', open);
   app.setAppUserModelId('app.workeve');
   setupChat(); setupIpc(); applyLoginItem(); updateTray(); createWindow();
-  if (START_HIDDEN) { const first = setup.checks(cfg); if (!first.ready) toast('Workeve needs setup', first.claude.loggedIn ? 'A required tool is missing. Open Workeve to finish.' : 'Sign in to Claude to use the chat and planner.', open); }
+  if (START_HIDDEN) { const first = setup.checks(cfg); if (!first.ready) toast(APP_NAME + ' needs setup', first.claude.loggedIn ? 'A required tool is missing. Open ' + APP_NAME + ' to finish.' : 'Sign in to Claude to use the chat and planner.', open); }
   if (process.argv.includes('--chat')) openChat();
   setInterval(poll, 15000);
 });

@@ -12,7 +12,7 @@ A tray app that starts with Windows, keeps the fleet dashboard, router loop and 
 - Config: `%APPDATA%\Workeve\config.json` (`fleet` = the fleet folder, `autostart`). Log: `%APPDATA%\Workeve\launcher.log`.
 - It starts the fleet with the fleet's own `start-dashboard.sh`, so it reuses a healthy server instead of starting a second one.
 - The window loads only `127.0.0.1`. The dashboard token is read by the app and never given to the page.
-- Quit leaves the fleet running. Set `EJAD_NO_AUTOSTART=1` to launch without registering startup.
+- Quit leaves the fleet running. Set `WV_NO_AUTOSTART=1` to launch without registering startup.
 - If `npm run pack` says `electron.exe` is missing: electron's zip extractor can fail silently on some Windows setups. Unzip `%LOCALAPPDATA%\electron\Cache\*\electron-v*-win32-x64.zip` into `node_modules/electron/dist` and write `electron.exe` into `node_modules/electron/path.txt`.
 - If you run it from VS Code's terminal, clear `ELECTRON_RUN_AS_NODE` first (VS Code sets it).
 
@@ -51,5 +51,5 @@ A tray app that starts with Windows, keeps the fleet dashboard, router loop and 
   link" turns it off. With the app closed there is no chat.
 - **Timeline logs**: a ticket's Logs tab and the Router panel show the agents' work like the chat does (Timeline, default) or as
   plain text (Text). Per agent: formatted messages, folded thinking, one row per tool (command with output, diffs for edits,
-  reads, searches), the plan as a checklist. Patches: `ejad-agent-steps.cjs` (server, `/api/ejad/steps`) and
-  `ejad-dashboard-steps.cjs` (page; it inlines `app/chat-md.js`).
+  reads, searches), the plan as a checklist. Patches: `agent-steps.cjs` (server, `/api/wv/steps`) and
+  `dashboard-steps.cjs` (page; it inlines `app/chat-md.js`).

@@ -1,8 +1,8 @@
 {
   "name": "workeve",
-  "productName": "Workeve",
-  "version": "0.3.0",
-  "description": "Windows launcher for the Ejad worker fleet: starts with Windows, keeps the dashboard, router and tunnel running, shows the dashboard in its own window.",
+  "productName": "Workerov",
+  "version": "0.4.1",
+  "description": "Windows launcher for the Workerov worker fleet: starts with Windows, keeps the dashboard, router and tunnel running, shows the dashboard in its own window.",
   "main": "main.js",
   "private": true,
   "scripts": {
@@ -22,7 +22,7 @@
   },
   "build": {
     "appId": "app.workeve",
-    "productName": "Workeve",
+    "productName": "Workerov",
     "directories": {
       "output": "dist-installer"
     },
@@ -42,7 +42,12 @@
       "icon.png",
       "package.json",
       "start.html",
-      "start-page.js"
+      "start-page.js",
+      "chat-bridge.js",
+      "chat-web.js",
+      "about.html",
+      "about-page.js",
+      "about-preload.js"
     ],
     "asarUnpack": [
       "node_modules/@anthropic-ai/claude-agent-sdk-win32-x64/**"
@@ -58,8 +63,8 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Workeve",
-      "uninstallDisplayName": "Workeve",
+      "shortcutName": "Workerov",
+      "uninstallDisplayName": "Workerov",
       "runAfterFinish": true
     },
     "afterPack": "after-pack.js"
