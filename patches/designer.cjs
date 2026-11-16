@@ -21,11 +21,11 @@ if (!fs.existsSync('.claude/scripts/mockup.cjs')) {
     'Design the mockup of the ticket \\`specs/tickets/${slug}\\`.${briefFile ? \' The brief is in \\`\' + briefFile + \'\\`.\' : \'\'} Follow your instructions in order: study first, then build, check with screenshots, then write the notes.${suffix ? \' Write mockup-\' + suffix + \'.html and mockup-notes-\' + suffix + \'.md instead; do not touch mockup.html or mockup-notes.md.\' : \'\'}');
   sub('Finish the ticket.', 'Finish the mockup.');
   sub('Continue the ticket.', 'Continue the mockup.');
-  sub('Writes one fleet ticket (rd.md + eval.md) from a task brief', 'Designs the mockup of one fleet ticket');
+  if (p.includes('Writes one fleet ticket (rd.md + eval.md) from a task brief')) sub('Writes one fleet ticket (rd.md + eval.md) from a task brief', 'Designs the mockup of one fleet ticket');
   sub('wv-planner', 'wv-designer');
   sub('-planner.log', '-designer.log');
   sub('status-writer-', 'status-designer-');
-  sub('planner-prompt-', 'designer-prompt-');
+  p = p.split('planner-prompt-').join('designer-prompt-');
   sub('PLANNER_', 'DESIGNER_');
   sub('planner', 'designer');
   fs.writeFileSync('.claude/scripts/mockup.cjs', p);
