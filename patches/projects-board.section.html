@@ -9,6 +9,7 @@
             Every project on this computer on one board. Only one worker runs at a time, whichever project it comes from;
             the other tickets wait their turn.
           </p>
+          <div id="projects-add" hidden style="margin: 0 0 12px"><button type="button" class="btn" id="projects-add-btn">Add project…</button> <span class="note-s">Pick a repository; its fleet is created for you and its tickets appear here.</span></div>
           <p id="projects-msg" class="note-s" role="status" style="margin: 0 0 8px"></p>
           <div id="projects-board" aria-live="polite"></div>
         </div>
@@ -16,6 +17,11 @@
       <script>
         (function () {
           var box = document.getElementById('projects-board');
+          var addWrap = document.getElementById('projects-add');
+          if (addWrap && window.fleetShell && window.fleetShell.addProject) {
+            addWrap.hidden = false;
+            document.getElementById('projects-add-btn').addEventListener('click', function () { window.fleetShell.addProject(); });
+          }
           if (!box) return;
           var timer = null;
           var ORDER = ['blocked', 'failed', 'in-review', 'in-progress', 'ready', 'specifying', 'draft', 'budget-exceeded', 'done'];

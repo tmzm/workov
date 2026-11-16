@@ -1,63 +1,50 @@
-# Workeve (Windows app)
+# Workerov (Windows app)
 
-A tray app that starts with Windows, keeps the fleet dashboard, router loop and tunnel running, and shows the dashboard in its own window.
+A tray app that starts with Windows, keeps the dashboard and the routers running, and shows the one dashboard in its own
+window. It also hosts the chat, first-run setup, notifications, the Background processes window and **Add project…**.
 
 ## Run it
-- Build: `npm install`, unzip Electron once if its installer fails (see below), then `npm run pack`.
-- Output: `dist/Workeve-win32-x64/Workeve.exe` (run it; a gold `{ }` icon appears in the tray).
-- Test without a window: `Workeve.exe --selftest` writes `%APPDATA%\Workeve\selftest.json`.
-- Start hidden in the tray: `--hidden` (what the Windows startup entry uses).
+- Develop: `npm install`, then `npm start` (clear `ELECTRON_RUN_AS_NODE` first if you run it from VS Code's terminal: VS Code sets it).
+- Build the installer: `npm run dist` writes `dist-installer/Workerov Setup <version>.exe` (NSIS, per user, no admin). It appears in
+  Settings > Apps and in Start, and upgrades in place (stable `appId`). Start with Windows is the tray toggle.
+- The installer bundles the fleet kit (`install.sh`, patches, overlay, `wv-bin`, the vendored worker-fleet) as
+  `resources/kit`, which **Add project…** runs. In development the kit is this repository.
+- Test without a window: `Workerov.exe --selftest` prints the checks as JSON. `WV_TEST_DIR=<folder>` gives a test run its own
+  settings and instance lock; `WV_NO_AUTOSTART=1` skips the Windows startup entry.
 
-## Notes
-- Config: `%APPDATA%\Workeve\config.json` (`fleet` = the fleet folder, `autostart`). Log: `%APPDATA%\Workeve\launcher.log`.
-- It starts the fleet with the fleet's own `start-dashboard.sh`, so it reuses a healthy server instead of starting a second one.
+## Projects and the window
+
+- **Add project…** (tray menu, the first-run page, and the dashboard's **All projects** tab): pick a repository. The app runs the
+  bundled `install.sh`, which creates the project's fleet home under `~/Workerov/fleets/<name>` and registers it in
+  `~/.workerov/fleets.json`. The repository itself is not touched. The first project becomes the dashboard's home; later
+  ones appear on the same board.
+- **Window:** opens maximized the first time, then where and how big you left it (position, size, maximized), also after a
+  quit. A saved position on a screen that is gone falls back to a default.
+- Settings: `%APPDATA%\Workeve\config.json` (the folder name is kept so settings survive renames: `fleet`, `autostart`,
+  `window`, `chatCwd`). Log: `%APPDATA%\Workeve\launcher.log`.
+- The dashboard is started with the fleet's own `start-dashboard.sh`, so a healthy server is reused, never doubled.
 - The window loads only `127.0.0.1`. The dashboard token is read by the app and never given to the page.
-- Quit leaves the fleet running. Set `WV_NO_AUTOSTART=1` to launch without registering startup.
-- If `npm run pack` says `electron.exe` is missing: electron's zip extractor can fail silently on some Windows setups. Unzip `%LOCALAPPDATA%\electron\Cache\*\electron-v*-win32-x64.zip` into `node_modules/electron/dist` and write `electron.exe` into `node_modules/electron/path.txt`.
-- If you run it from VS Code's terminal, clear `ELECTRON_RUN_AS_NODE` first (VS Code sets it).
 
+## Chat and setup
 
-## Chat, setup and installer (stage 2)
-
-- **Chat tab**: inside this app the dashboard gets a Chat tab (Board, Chat, Providers, Telemetry stay on the bar; Ring,
-  Graph, Ports and Audit are under More). It runs Claude on your Claude plan through the bundled Agent SDK: streamed
-  replies, thinking rows, one collapsible row per tool call (diffs for edits), a live plan, Allow/Deny cards, slash
-  commands and skills, MCP servers, plugins, attachments (files, pasted or dropped images) and past chats. It follows the
-  dashboard's live theme. It talks to this app over local IPC only; the tab does not exist in a browser or on the phone link.
-- **Working folder**: the folder button picks where Claude works: browse to any path, the fleet folder, a worker's
-  worktree (`<fleet>-NNN-...`) or a recent folder.
-- **First-run setup**: a welcome window checks Claude first (installed, signed in, account and plan, with a Sign in button),
-  then Git Bash, Python, Node, OpenCode, the fleet folder and cloudflared (optional). It re-checks by itself and opens again
-  from the tray (Setup & checks) whenever a required step goes missing. Without a Claude sign-in the chat is locked; workers
-  still run on the connected providers.
-- **Notifications**: provider problem, stuck router, a ticket that stopped building, a model switch waiting for you, Claude
-  waiting for permission or finished (only when the window is not in front). The installer gives the app its own Windows identity
-  so they are reliable. "Test notification" is in Setup.
-- **Installer**: `npm run dist` builds `dist-installer/Workeve Setup <version>.exe` (NSIS, per user, no admin). It appears in
-  Settings > Apps (uninstall there) and in Start. Start with Windows is the tray toggle and also shows in Settings > Apps > Startup.
-  Silent install/uninstall for testing: `Setup.exe /S /D=<folder>` and `Uninstall Workeve.exe /currentuser /S`.
-- **Mockups**: `mockup/build-mockups.py` regenerates the three theme mockups and `chat.css`/`chat.html` from `mockup/chat-base.html`,
-  `chat.template.html` and `chat-extra.css`. Edit those, not the generated files.
-
-## Workeve: phone chat and timeline logs
-
-- **Name and logo**: the app is Workeve. The gold braces icon is the logo (installer, taskbar, start screen, chat header).
-  Settings moved from `%APPDATA%\EjadFleet` to `%APPDATA%\Workeve` (copied automatically on first start).
-- **Chat from the phone link**: the full-access dashboard link shows a Chat tab when this app is running. The page is the same
-  chat, served by the dashboard server (`/chat/`), and the conversation is shared with the desktop one. How it is kept safe:
-  the app listens on 127.0.0.1 only (secret in `job/chat-bridge.json`); the server allows it only for the full-access token from
-  another device (never the read-only link, never this computer); a short list of actions; no "Allow all" from the phone; no
-  folder dialogs (folders come from a list); the audit log keeps the action name, never your prompt. Tray: "Chat from the phone
-  link" turns it off. With the app closed there is no chat.
-- **Timeline logs**: a ticket's Logs tab and the Router panel show the agents' work like the chat does (Timeline, default) or as
-  plain text (Text). Per agent: formatted messages, folded thinking, one row per tool (command with output, diffs for edits,
-  reads, searches), the plan as a checklist. Patches: `agent-steps.cjs` (server, `/api/wv/steps`) and
-  `dashboard-steps.cjs` (page; it inlines `app/chat-md.js`).
+- **Chat tab:** inside this app the dashboard gets a Chat tab. It runs Claude on your Claude plan through the bundled Agent SDK:
+  streamed replies, thinking rows, one row per tool call (diffs for edits), a live plan, Allow/Deny cards, slash commands and
+  skills, MCP servers, plugins, attachments and past chats. It follows the dashboard's theme and talks to the app over local IPC
+  only; it does not exist in a browser or on the phone link, except the phone chat below.
+- **Working folder:** the folder button picks where Claude works: any path, a fleet home, a worker's worktree or a recent folder.
+- **First-run setup:** checks Claude (installed, signed in, plan, with a Sign in button), then Git Bash, Python, Node, OpenCode,
+  a project (with **Add a project**) and cloudflared (optional). It re-checks by itself and reopens from the tray (Setup &
+  checks) when a required step goes missing.
+- **Notifications:** provider problem, stuck router, a ticket that stopped building, a model switch waiting for you, Claude waiting
+  for permission or finished (only when the window is not in front).
+- **Phone chat:** the full-access dashboard link shows a Chat tab while this app runs (served by the dashboard at `/chat/`). It is
+  kept safe: the app listens on 127.0.0.1 only; the server allows it for the full-access token from another device only; a short list
+  of actions; no "Allow all" from the phone; the audit log keeps the action name, never your prompt. Tray: "Chat from the phone link".
+- **Timeline logs:** a ticket's Logs tab and the Router panel show the agents' work like the chat does (Timeline) or as text.
 
 ## Background processes
 
-Tray menu → **Background processes…**, or the **Background processes…** button in the dashboard's System panel. The
-window lists what the fleet runs on this computer, grouped as Dashboard, Router, Agents, Tests and builds, Chat and
-Network, each with its memory (a test run includes its browser and bundler). **Stop…** asks first and explains what
-could break; it then ends that process and the ones it started. Nothing else is stopped: Workerov itself is never
-listed, and a stop re-reads the live list so a reused process id can never be hit by mistake. Windows only.
+Tray menu → **Background processes…**, or the button in the dashboard's System panel. It lists what the fleet runs, grouped as
+Dashboard, Router, Agents, Tests and builds, Chat and Network, each with its memory (a test run includes its browser and bundler).
+**Stop…** asks first and explains what could break, then ends that process and the ones it started. Workerov itself is never
+listed, and a stop re-reads the live list so a reused process id is never hit by mistake. Windows only.

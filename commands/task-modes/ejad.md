@@ -23,12 +23,13 @@ The two modes never mix:
   Claude plans in the plans folder, opens the draft MR and hands me the implementation prompt (the **Final
   result**); I run the implementer myself, then call `review` and `deliver`. Claude runs the provider itself only
   when my input also says `run` (see "Running the provider").
-- **Where the fleet lives:** the repo itself when `specs/worker-fleet.config.json` exists; otherwise its fleet clone,
-  the sibling folder `<repo>-fleet` (e.g. `E:\Projects\Ejad\dashboard-fleet`) when that has the config. Neither →
-  stop and ask me whether to install worker-fleet (`ejad-fleet/install.sh`).
-- **Start the dashboard first** (`bash .claude/scripts/start-dashboard.sh` in the fleet folder) and give me
-  `http://localhost:3080` before any planning, so the ticket is visible from the moment it is created.
-- **One router at a time.** If a router is already running, don't start a second one: add the ticket as `ready` and
+- **Where the fleet lives:** every project has a fleet home, listed in `~/.workerov/fleets.json` (normally
+  `~/Workerov/fleets/<project>`: a clone of the repo with the fleet installed). Use the one registered for this repo, or the repo
+  itself when `specs/worker-fleet.config.json` exists there. None → stop and ask me whether to add the project
+  (Workerov app: **Add project…**, or `bash <workerov kit>/install.sh <repo>`).
+- **One dashboard for every project** at `http://localhost:3080`: don't start another one. If it is not running, start the
+  fleet's `bash .claude/scripts/start-dashboard.sh` once; the ticket is visible there from the moment it is created.
+- **One router at a time, across all projects.** If a router is already running, don't start a second one: add the ticket as `ready` and
   let the running router pick it up (start it without restricting it to one ticket); if it was started for one
   ticket only, start a fresh router for the new ticket when it exits.
 - **Pushing:** landing needs the fleet folder to push to GitLab. If `remote.origin.pushurl` is disabled there, ask

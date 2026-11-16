@@ -20,12 +20,12 @@ function rows(r) {
     const info = h('div', 'info', null, row), t = h('b', null, it.name, info); if (!it.required) h('span', 'opt', 'optional', t);
     h('span', null, it.ok ? it.detail : it.hint + (it.detail ? ' · ' + it.detail : ''), info);
     if (!it.ok) {
-      const label = { 'claude-login': 'Sign in to Claude', link: 'Get it', 'pick-fleet': 'Choose folder' }[it.action];
+      const label = { 'claude-login': 'Sign in to Claude', link: 'Get it', 'pick-fleet': 'Choose folder', 'add-project': 'Add a project' }[it.action];
       const b = h('button', 'btn' + (it.id === 'claude' ? ' primary' : ''), label, row); b.type = 'button';
       b.onclick = async () => {
         if (busy) return; busy = true; b.disabled = true;
         if (it.action === 'claude-login') { $('msg').textContent = 'Finish signing in in your browser…'; await fleetSetup.claudeLogin(); $('msg').textContent = ''; }
-        else if (it.action === 'pick-fleet') await fleetSetup.pickFleet(); else await fleetSetup.open(it.link);
+        else if (it.action === 'pick-fleet') await fleetSetup.pickFleet(); else if (it.action === 'add-project') await fleetSetup.addProject(); else await fleetSetup.open(it.link);
         busy = false; check();
       };
     }

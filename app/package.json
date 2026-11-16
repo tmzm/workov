@@ -1,7 +1,7 @@
 {
   "name": "workeve",
   "productName": "Workerov",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "description": "Windows launcher for the Workerov worker fleet: starts with Windows, keeps the dashboard, router and tunnel running, shows the dashboard in its own window.",
   "main": "main.js",
   "private": true,
@@ -51,7 +51,8 @@
       "chat-web.js",
       "about.html",
       "about-page.js",
-      "about-preload.js"
+      "about-preload.js",
+      "add-project.js"
     ],
     "asarUnpack": [
       "node_modules/@anthropic-ai/claude-agent-sdk-win32-x64/**"
@@ -71,6 +72,27 @@
       "uninstallDisplayName": "Workerov",
       "runAfterFinish": true
     },
-    "afterPack": "after-pack.js"
+    "afterPack": "after-pack.js",
+    "extraResources": [
+      {
+        "from": "..",
+        "to": "kit",
+        "filter": [
+          "install.sh",
+          "uninstall.sh",
+          "exclude.txt",
+          "profile.example.json",
+          "LICENSE",
+          "patches/**/*",
+          "overlay/**/*",
+          "wv-bin/**/*",
+          "commands/**/*",
+          "vendor/**/*",
+          "!**/node_modules/**",
+          "!**/job/**",
+          "!**/__pycache__/**"
+        ]
+      }
+    ]
   }
 }

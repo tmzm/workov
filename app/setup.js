@@ -38,10 +38,10 @@ function checks(cfg) {
     { id: 'python', name: 'Python 3', required: true, ok: has('python.exe'), detail: has('python.exe') ? ver('python', ['--version']) : 'missing', hint: 'The dashboard server is Python', action: 'link', link: 'https://www.python.org/downloads/' },
     { id: 'node', name: 'Node.js', required: true, ok: has('node.exe'), detail: has('node.exe') ? ver('node', ['--version']) : 'missing', hint: 'Patches and the planner use Node', action: 'link', link: 'https://nodejs.org/' },
     { id: 'opencode', name: 'OpenCode', required: true, ok: has('opencode.cmd') || has('opencode.exe') || has('opencode'), detail: has('opencode.cmd') || has('opencode.exe') || has('opencode') ? 'found' : 'missing', hint: 'Workers run on OpenCode (npm i -g opencode-ai)', action: 'link', link: 'https://opencode.ai/docs/' },
-    { id: 'fleet', name: 'Fleet folder', required: true, ok: fleetOk, detail: fleetOk ? cfg.fleet : 'Choose the folder that holds specs/worker-fleet.config.json', hint: 'The project the fleet works on', action: 'pick-fleet' },
+        { id: 'fleet', name: 'A project', required: true, ok: fleetOk, detail: fleetOk ? cfg.fleet : 'Add the repository the fleet will work on', hint: 'Its fleet is created for you; your repository is not touched', action: 'add-project' },
     { id: 'cloudflared', name: 'cloudflared (phone link)', required: false, ok: has('cloudflared.exe'), detail: has('cloudflared.exe') ? 'found' : 'optional', hint: 'Only needed to open the dashboard on your phone', action: 'link', link: 'https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/' },
   ];
   return { items: list, ready: list.filter((x) => x.required).every((x) => x.ok), claude };
 }
 
-module.exports = { checks, claudeStatus, claudeLogin };
+module.exports = { checks, claudeStatus, claudeLogin, gitBash };

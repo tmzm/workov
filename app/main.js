@@ -159,6 +159,7 @@ function menu() {
     { label: 'Restart router (fresh session)', click: () => act('wv_router_restart') },
     { type: 'separator' },
     { label: 'Start with Windows', type: 'checkbox', checked: !!cfg.autostart, click: (i) => { cfg.autostart = i.checked; saveCfg(); applyLoginItem(); } },
+    { label: 'Add project…', click: () => addProject(win) },
     { label: 'Choose fleet folder…', click: chooseFleet },
     { label: 'Chat from the phone link', type: 'checkbox', checked: cfg.remoteChat !== false, click: (i) => { cfg.remoteChat = i.checked; saveCfg(); } },
     { label: 'Background processes…', click: openProcesses },
@@ -170,6 +171,29 @@ function menu() {
 }
 function updateTray() { if (!tray) return; tray.setToolTip(APP_NAME + ': ' + status.text); tray.setContextMenu(menu()); }
 function applyLoginItem() { if (process.env.WV_NO_AUTOSTART) return; if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!cfg.autostart, args: ['--hidden'] }); }
+// ---------- add a project: its fleet is created from the bundled kit; the repository is not touched ----------
+let addingProject = false;
+async function addProject(parent) {
+  if (addingProject) return { ok: false, error: 'A project is already being added.' };
+  const ap = require('./add-project');
+  const bash = require('./setup').gitBash();
+  if (!bash) { dialog.showErrorBox('Git Bash is missing', 'Install Git for Windows first (the fleet scripts run in Git Bash).'); return { ok: false }; }
+  const r = await dialog.showOpenDialog(parent || undefined, { title: 'Choose the project folder (a git repository)', properties: ['openDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, cancelled: true };
+  const repo = r.filePaths[0];
+  if (!ap.isGitRepo(repo)) { dialog.showMessageBox(parent || undefined, { type: 'warning', message: 'That folder is not a git repository.', detail: 'Pick the folder that contains the .git folder of your project.' }); return { ok: false }; }
+  const name = path.basename(repo);
+  addingProject = true;
+  toast('Adding ' + name, 'Creating its fleet. This takes a minute or two; you will be told when it is ready.');
+  const res = await ap.install({ app, bash, repo, name, logFile: path.join(app.getPath('userData'), 'add-project.log') });
+  addingProject = false;
+  if (!res.ok) { dialog.showMessageBox(parent || undefined, { type: 'error', message: 'Could not add ' + name, detail: (res.error || '') + ' The log is at ' + res.log }); return res; }
+  // the first project becomes the dashboard's home; later ones are shown on the same board
+  if (!fs.existsSync(path.join(cfg.fleet, 'specs', 'worker-fleet.config.json'))) { cfg.fleet = res.root; saveCfg(); lastStart = 0; poll(); }
+  toast(name + ' added', 'Its tickets now appear on the board.');
+  return res;
+}
+
 async function chooseFleet(parent) {
   const r = await dialog.showOpenDialog(parent || undefined, { title: 'Choose the fleet folder (it contains specs/worker-fleet.config.json)', properties: ['openDirectory'], defaultPath: cfg.fleet });
   if (!r.canceled && r.filePaths[0]) { cfg.fleet = r.filePaths[0]; saveCfg(); lastStart = 0; poll(); }
@@ -274,6 +298,7 @@ function setupChat() {
     try { return 'data:image/jpeg;base64,' + (await chatView.webContents.capturePage()).toJPEG(85).toString('base64'); } catch { return null; }
   });
   ipcMain.handle('shell:openProcesses', (e) => { if (fromDashboard(e)) openProcesses(); });
+  ipcMain.handle('shell:addProject', async (e) => { if (fromDashboard(e)) return addProject(win); });
   ipcMain.handle('shell:chatHide', (e) => { if (fromDashboard(e)) hideChatView(); });
 }
 
@@ -284,6 +309,7 @@ function setupIpc() {
   ipcMain.handle('setup:checks', (e) => (ok(e) ? setup.checks(cfg) : null));
   ipcMain.handle('setup:claudeLogin', (e) => (ok(e) ? setup.claudeLogin() : null));
   ipcMain.handle('setup:pickFleet', async (e) => { if (!ok(e)) return; await chooseFleet(win); });
+  ipcMain.handle('setup:addProject', async (e) => { if (!ok(e)) return; await addProject(win); });
   ipcMain.handle('setup:open', (e, url) => { if (ok(e) && /^https:\/\//.test(String(url))) shell.openExternal(String(url)); });
   ipcMain.handle('setup:testNotification', (e) => { if (ok(e)) toast('Notifications work', 'You will hear about finished tickets, provider problems and permission requests.'); });
   ipcMain.handle('setup:launch', async (e) => {

@@ -3,12 +3,13 @@
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
 // the start screen's calls (main.js answers them only for start.html in this window)
-const setupApi = {}; for (const c of ['checks', 'claudeLogin', 'pickFleet', 'open', 'testNotification', 'launch']) setupApi[c] = (a) => ipcRenderer.invoke('setup:' + c, a);
+const setupApi = {}; for (const c of ['checks', 'claudeLogin', 'pickFleet', 'addProject', 'open', 'testNotification', 'launch']) setupApi[c] = (a) => ipcRenderer.invoke('setup:' + c, a);
 if (/\/start\.html/.test(location.pathname)) contextBridge.exposeInMainWorld('fleetSetup', setupApi);
 contextBridge.exposeInMainWorld('fleetShell', {
   chatShow: (rect) => ipcRenderer.invoke('shell:chatShow', rect),
   chatHide: () => ipcRenderer.invoke('shell:chatHide'),
   openProcesses: () => ipcRenderer.invoke('shell:openProcesses'),
+  addProject: () => ipcRenderer.invoke('shell:addProject'),
   chatSnapshot: () => ipcRenderer.invoke('shell:chatSnapshot'),
   chatTheme: (s) => ipcRenderer.invoke('shell:chatTheme', s),
 });
