@@ -91,15 +91,26 @@ if (!h.includes('id="views-more"')) {
     }
     return best;
   }
+  var snapOn = false;
+  function snapClear() { var s = document.getElementById('chat-snap'); if (s) s.remove(); }
   function chatPlace() {
     if (!shell || !onChat) return;
     var host = document.getElementById('chat-host'); if (!host) return;
     var r = host.getBoundingClientRect(), over = topOverlay();
-    var right = r.left + r.width;
-    if (over && over.left < right && over.left > r.left) right = over.left;
-    var width = right - r.left;
-    if (width < 180) { shell.chatHide(); return; }
-    shell.chatShow({ x: r.left, y: r.top, width: width, height: Math.max(200, window.innerHeight - r.top) });
+    var covered = !!(over && over.left < r.right && over.right > r.left && over.top < r.bottom && over.bottom > r.top);
+    if (covered) {
+      if (snapOn) return;
+      snapOn = true;
+      // the native chat view always draws above the page, so while an overlay is open the chat is shown as a still image
+      shell.chatSnapshot().then(function (url) {
+        if (!snapOn) return;
+        if (url) { snapClear(); var im = new Image(); im.id = 'chat-snap'; im.alt = ''; im.src = url; im.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none'; host.style.position = 'relative'; host.appendChild(im); }
+        shell.chatHide();
+      });
+      return;
+    }
+    if (snapOn) { snapOn = false; snapClear(); }
+    shell.chatShow({ x: r.left, y: r.top, width: r.width, height: Math.max(200, window.innerHeight - r.top) });
   }
   window.wvNavSync = function (tab) {
     close();
@@ -108,11 +119,12 @@ if (!h.includes('id="views-more"')) {
     if (!shell) return;
     onChat = tab === 'chat';
     if (onChat) { requestAnimationFrame(function () { chatPlace(); setTimeout(chatPlace, 120); }); if (!obs && window.ResizeObserver) { obs = new ResizeObserver(chatPlace); obs.observe(document.getElementById('chat-host')); } }
-    else shell.chatHide();
+    else { snapOn = false; snapClear(); shell.chatHide(); }
   };
+  document.addEventListener('transitionend', function () { if (onChat) chatPlace(); }, true);
   // a dashboard dialog, drawer or dropdown opening over the chat must never sit under it
   if (shell && window.MutationObserver) new MutationObserver(function () {
-    if (onChat) chatPlace();
+    if (onChat) { chatPlace(); [120, 350, 700].forEach(function (ms) { setTimeout(chatPlace, ms); }); }
   }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden', 'open', 'class'] });
 })();
 </script>
@@ -122,3 +134,10 @@ if (!h.includes('id="views-more"')) {
   fs.writeFileSync(H, h);
 }
 console.log('nav + chat tab patch applied');
+
+// The chat is drawn as a still image while a dashboard popup is open (see chatPlace), and that image is a data: URL.
+{
+  const S = '.claude/scripts/dashboard-server.py';
+  const s = fs.readFileSync(S, 'utf8');
+  if (s.includes("img-src 'self'; connect-src 'self'")) fs.writeFileSync(S, s.replace("img-src 'self'; connect-src 'self'", "img-src 'self' data:; connect-src 'self'"));
+}

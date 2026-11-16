@@ -265,6 +265,10 @@ function setupChat() {
     lastTheme = { style: ['andon', 'cyberpunk', 'tmzm'].includes(s.style) ? s.style : 'andon', mode: s.mode === 'light' ? 'light' : 'dark', tokens };
     if (chatView && !chatView.webContents.isDestroyed()) { chatView.webContents.send('chat:event', 'theme', lastTheme); if (/^#[0-9a-f]{3,8}$/i.test(tokens.bg || '')) chatView.setBackgroundColor(tokens.bg); }
   });
+  ipcMain.handle('shell:chatSnapshot', async (e) => {
+    if (!fromDashboard(e) || !chatView || !chatViewShown || chatView.webContents.isDestroyed()) return null;
+    try { return 'data:image/jpeg;base64,' + (await chatView.webContents.capturePage()).toJPEG(85).toString('base64'); } catch { return null; }
+  });
   ipcMain.handle('shell:chatHide', (e) => { if (fromDashboard(e)) hideChatView(); });
 }
 
