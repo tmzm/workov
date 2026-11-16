@@ -119,3 +119,14 @@ here: give them allow rules in their own settings (Kilo's permission config; Ant
 
 worker-fleet is not bundled: pass its folder or git URL to `install.sh`. It is used by the team already (ticket 003);
 ask its author before publishing a copy of it.
+
+## Machine limits
+
+The installer adds three guards so a small machine is not run out of memory:
+
+- `tunnel-windows`: `start-dashboard.sh` reuses the cloudflared connector already running for its port (and stops
+  duplicates); `--stop` ends every connector for that port. Before this, each restart left one more connector behind.
+- `resource-rules`: every fleet agent is told to use the package manager the project pins in `packageManager` (never
+  npm in a pnpm project) and to run heavy commands through `heavy-run.sh`.
+- `heavy-run.sh <command...>`: a machine-wide lock, so only one install, test, build or lint runs at a time across all
+  fleets on the computer. A lock whose owner has died is taken over.
