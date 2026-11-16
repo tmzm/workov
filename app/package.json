@@ -1,7 +1,7 @@
 {
   "name": "workeve",
   "productName": "Workerov",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Windows launcher for the Workerov worker fleet: starts with Windows, keeps the dashboard, router and tunnel running, shows the dashboard in its own window.",
   "main": "main.js",
   "private": true,
