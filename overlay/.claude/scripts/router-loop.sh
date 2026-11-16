@@ -30,13 +30,12 @@ answered() {
 active() { working || answered; }
 # One worker at a time across every project on this machine: when another registered fleet (~/.workerov/fleets.json)
 # has a live worker, this cycle may reconcile and answer decisions but must not start a worker.
-# A project that is only waiting for another project's worker (nothing of its own building, no answered decision to hand
-# over) needs no model call: sleeping costs nothing, a cycle that only says "dispatch paused" costs tokens every interval.
-waiting_only() {
-  [ -n "$(python3 -I "$HOME/.wv-bin/wv-busy.py" "$PWD" 2>/dev/null | tr -d '\r')" ] || return 1
-  grep -qE '^\| [0-9]{3} .*\| in-progress *\|' specs/tickets/BOARD.md && return 1
-  answered && return 1
-  return 0
+# One router for every project: only the project whose turn it is makes a router model call (wv-turn.py decides: a project with
+# a live worker, an in-progress ticket or an answered decision is always watched; a ready one starts only when no worker runs
+# anywhere, in fair turns). The others just sleep, which costs nothing.
+not_my_turn() {
+  TURN_WHY="$(python3 -I "$HOME/.wv-bin/wv-turn.py" "$PWD" 2>/dev/null | tr -d '\r')"
+  [ "$TURN_WHY" != "run" ]
 }
 busy_note() {
   local b
@@ -62,8 +61,8 @@ SID="${WV_ROUTER_SESSION:-}"
 FIRST="Run the fleet. Reconcile job/router-state.json first: a worker listed there may still be alive inside OpenCode (check its job/status.json heartbeat and its session) before you re-dispatch it. Dispatch every ready ticket, verify finished ones against eval.md, and land them per their Landing mode. Do one full cycle, then end your turn; you will be called again."
 NEXT="Next router cycle: reconcile, read worker heartbeats and results, dispatch ready tickets, verify and land finished ones, answer or record pending decisions. Then end your turn."
 while active; do
-  if waiting_only; then
-    echo "[router-loop] waiting for another project's worker: no router cycle until it is done"
+  if not_my_turn; then
+    echo "[router-loop] ${TURN_WHY:-no router cycle now}: no router call"
     sleep "$INTERVAL"
     continue
   fi
