@@ -1,0 +1,9 @@
+# worker-fleet runtime directories & logs
+job/
+.claude/worktrees/
+__pycache__/
+*.py[cod]
+.DS_Store
+.continue
+# Regression sweep evidence (checker full mode): runtime output, never committed
+specs/regression-evidence/

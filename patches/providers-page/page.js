@@ -19,8 +19,8 @@
   async function load(force) {
     $('pvp-grid').textContent = 'Loading providers…';
     try {
-      var c = await api('/api/ejad/catalog' + (force ? '?refresh=1' : ''));
-      var p = await api('/api/ejad/providers');
+      var c = await api('/api/wv/catalog' + (force ? '?refresh=1' : ''));
+      var p = await api('/api/wv/providers');
       state.cat = c.providers || []; state.connected = c.connected || [];
       state.models = p.models || []; state.planner = p.planner || { runtime: 'claude', claude: 'sonnet' };
       $('pvp-sub').textContent = state.cat.length + ' providers · ' + state.connected.length + ' connected' + (c.stale ? ' · offline list' : '');
@@ -75,7 +75,7 @@
       var d = el('button', 'btn btn-sm', 'Disconnect'); d.type = 'button';
       d.onclick = async function () {
         if (!confirm('Disconnect ' + p.name + '?')) return;
-        var x = await ejadPost({ action: 'ejad_disconnect_provider', provider: p.id });
+        var x = await wvPost({ action: 'wv_disconnect_provider', provider: p.id });
         toast(x.ok ? p.name + ' disconnected' : (x.j.error || 'Failed'), !x.ok); if (x.ok) load();
       };
       act.append(t, d);
@@ -86,7 +86,7 @@
       var b = el('button', 'btn btn-sm btn-primary', 'Connect'); b.type = 'button';
       var go = async function () {
         if (!k.value.trim()) { k.focus(); return; }
-        b.disabled = true; var x = await ejadPost({ action: 'ejad_connect_provider', provider: p.id, key: k.value.trim() }); k.value = ''; b.disabled = false;
+        b.disabled = true; var x = await wvPost({ action: 'wv_connect_provider', provider: p.id, key: k.value.trim() }); k.value = ''; b.disabled = false;
         toast(x.ok ? p.name + ' connected (' + x.j.models + ' models)' : (x.j.error || 'Could not connect'), !x.ok); if (x.ok) load();
       };
       b.onclick = go; k.onkeydown = function (e) { if (e.key === 'Enter') go(); };
@@ -114,21 +114,21 @@
     if (!ms.length) { toast('No models listed for ' + p.name + ' yet. Press Refresh.', true); return; }
     var m = ms.filter(function (x) { return /-free$/.test(x); })[0] || ms[0];
     state.testing[p.id] = true; renderGrid();
-    var x = await ejadPost({ action: 'ejad_test_model', model: m });
+    var x = await wvPost({ action: 'wv_test_model', model: m });
     delete state.testing[p.id]; renderGrid();
     toast(x.ok ? (x.j.ok ? p.name + ' works (' + m + ')' : p.name + ' failed: ' + x.j.detail) : (x.j.error || 'Test failed'), !(x.ok && x.j.ok));
   }
 
   $('pvp-save').onclick = async function () {
     var v = $('pvp-planner').value;
-    var x = await ejadPost({ action: 'ejad_set_planner', choice: v });
+    var x = await wvPost({ action: 'wv_set_planner', choice: v });
     toast(x.ok ? 'Planner is now ' + v + ' (next ticket plan)' : (x.j.error || 'Could not change the planner'), !x.ok); if (x.ok) load();
   };
   $('pvp-ptest').onclick = async function () {
     var v = $('pvp-planner').value; var b = $('pvp-ptest');
     if (v.indexOf('claude:') === 0) { toast('Claude runs on your Claude plan; nothing to test here.'); return; }
     b.disabled = true; b.textContent = 'Testing…';
-    var x = await ejadPost({ action: 'ejad_test_model', model: v });
+    var x = await wvPost({ action: 'wv_test_model', model: v });
     b.disabled = false; b.textContent = 'Test';
     toast(x.ok ? (x.j.ok ? v + ' works' : v + ' failed: ' + x.j.detail) : (x.j.error || 'Test failed'), !(x.ok && x.j.ok));
   };
@@ -147,6 +147,6 @@
   function close() { root.hidden = true; document.body.style.overflow = ''; if (location.hash === '#providers') history.replaceState(null, '', location.pathname + location.search); }
   $('pvp-close').onclick = close;
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !root.hidden) close(); });
-  window.ejadOpenProvidersPage = open;
+  window.wvOpenProvidersPage = open;
   if (location.hash === '#providers') open();
 })();

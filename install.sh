@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# ejad-fleet installer: worker-fleet + the Ejad layer (GitLab MR / Plane / Ejad HR landing, OpenCode Go models,
+# wv-fleet installer: worker-fleet + the Workerov layer (GitLab MR / Plane / Workerov HR landing, OpenCode Go models,
 # permission approvals, mockup tab, Copilot/Kilo/Antigravity implementers) + the /ejadtask command.
 #
-#   bash install.sh <target-repo> --worker-fleet <path-or-git-url> [--no-command] [--no-setup]
+#   bash install.sh <target-repo> [--worker-fleet <path-or-git-url>] [--no-command] [--no-setup]
+#
+# --worker-fleet defaults to vendor/worker-fleet next to this script (a local checkout kept for exactly this,
+# since worker-fleet has no package registry or public git URL of its own); pass a path or git URL to use another.
 #
 # Everything installed into the target repo stays out of git (written to .git/info/exclude); tracked files the
-# worker-fleet installer would replace are restored. Requires: git, bash, node, python3; opencode for the fleet.
+# worker-fleet installer would replace are restored. Requires: git, bash, node, a real python 3; opencode for the fleet.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -15,14 +18,25 @@ while [ $# -gt 0 ]; do
     --worker-fleet) WF="$2"; shift 2 ;;
     --no-command) DO_COMMAND=0; shift ;;
     --no-setup) DO_SETUP=0; shift ;;
-    -h|--help) sed -n 2,9p "$0"; exit 0 ;;
+    -h|--help) sed -n 2,10p "$0"; exit 0 ;;
     *) TARGET="$1"; shift ;;
   esac
 done
-[ -n "$TARGET" ] && [ -d "$TARGET/.git" -o -f "$TARGET/.git" ] || { echo "usage: bash install.sh <target-repo> --worker-fleet <path-or-git-url>" >&2; exit 2; }
-[ -n "$WF" ] || { echo "missing --worker-fleet <path-or-git-url> (worker-fleet itself is not bundled)" >&2; exit 2; }
+[ -n "$TARGET" ] && [ -d "$TARGET/.git" -o -f "$TARGET/.git" ] || { echo "usage: bash install.sh <target-repo> [--worker-fleet <path-or-git-url>]" >&2; exit 2; }
+if [ -z "$WF" ]; then
+  [ -f "$HERE/vendor/worker-fleet/.claude/scripts/install.sh" ] || { echo "missing --worker-fleet <path-or-git-url>, and no vendored copy at $HERE/vendor/worker-fleet" >&2; exit 2; }
+  WF="$HERE/vendor/worker-fleet"
+fi
 TARGET="$(cd "$TARGET" && pwd)"
-for bin in git node python3; do command -v "$bin" >/dev/null || { echo "missing $bin" >&2; exit 2; }; done
+for bin in git node; do command -v "$bin" >/dev/null || { echo "missing $bin" >&2; exit 2; }; done
+# Windows ships a python3.exe/python.exe "app execution alias" stub under WindowsApps that sits on PATH ahead of a
+# real install and does nothing but redirect to the Store, so `command -v python3` alone proves nothing here; a real
+# interpreter must actually run code. Prefer python3, fall back to python, and use this resolved name everywhere below.
+PY3=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && [ "$("$cand" -c 'print(1)' 2>/dev/null)" = "1" ]; then PY3="$cand"; break; fi
+done
+[ -n "$PY3" ] || { echo "missing a working python 3 (python3/python on PATH resolve to Windows's App Store stub, not a real interpreter — install Python and make sure it comes first on PATH)" >&2; exit 2; }
 
 # 1. worker-fleet source (a local folder or a git URL)
 if [ -d "$WF" ]; then
@@ -52,13 +66,13 @@ if [ "$DO_SETUP" = 1 ]; then
     c.models.router.claude = { model: "sonnet", effort: "medium" };
     c.models.reviewer.delegateCli = "none"; c.models.worker.delegateCli = "none";
     fs.writeFileSync(f, JSON.stringify(c, null, 2) + "\n");' \
-    && python3 .claude/scripts/apply-setup.py --preset custom --harness opencode --landing pr --max-workers 2 \
+    && "$PY3" .claude/scripts/apply-setup.py --preset custom --harness opencode --landing pr --max-workers 2 \
          --main-port 4200 --dashboard on --tunnel local --budget-usd 3 | tail -5 )
 fi
 
-# 4. the Ejad layer: overlay files, then patches (after setup, which regenerates agent files)
+# 4. the Workerov layer: overlay files, then patches (after setup, which regenerates agent files)
 cp -R "$HERE/overlay/." "$TARGET/"
-for p in ejad-agents ejad-worker ejad-dashboard ejad-agent-logs ejad-agent-roster ejad-decision-help ejad-dashboard-run ejad-dashboard-review ejad-dashboard-pause ejad-dashboard-overlay ejad-dashboard-fixes ejad-dashboard-insight ejad-dashboard-providers2 ejad-dashboard-connect ejad-dashboard-providers-page ejad-dashboard-providers-tab ejad-dashboard-providers-v2 ejad-dashboard-keystore ejad-dashboard-issue ejad-dashboard-answered ejad-dashboard-roster ejad-dashboard-readonly ejad-dashboard-router ejad-dashboard-mobile ejad-dashboard-theme ejad-dashboard-themes2 ejad-dashboard-polish ejad-named-tunnel ejad-delegate ejad-windows ejad-designer ejad-dashboard-claude ejad-dashboard-claude-account ejad-dashboard-cardfix ejad-telemetry-v2 ejad-dashboard-agentmodels ejad-dispatch-reliable ejad-failover ejad-dashboard-workers ejad-dashboard-workers2 ejad-worker-worktree ejad-land-branch ejad-dashboard-nav-chat ejad-dashboard-chat-theme ejad-chat-bridge ejad-dashboard-chat-web ejad-agent-steps ejad-dashboard-steps; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
+for p in agents worker dashboard agent-logs agent-roster decision-help dashboard-run dashboard-review dashboard-pause dashboard-overlay dashboard-fixes dashboard-insight dashboard-providers2 dashboard-connect dashboard-providers-page dashboard-providers-tab dashboard-providers-v2 dashboard-keystore dashboard-issue dashboard-answered dashboard-roster dashboard-readonly dashboard-router dashboard-mobile dashboard-theme dashboard-themes2 dashboard-polish named-tunnel delegate windows designer dashboard-claude dashboard-claude-account dashboard-cardfix telemetry-v2 dashboard-agentmodels dispatch-reliable failover dashboard-workers dashboard-workers2 worker-worktree land-branch dashboard-nav-chat dashboard-chat-theme chat-bridge dashboard-chat-web agent-steps dashboard-steps; do ( cd "$TARGET" && node "$HERE/patches/$p.cjs" ); done
 
 # A running OpenCode background server keeps the agent list it loaded at start: without a reload, new agents such
 # as `worker` fail with "Agent not found" when the router dispatches them.
@@ -71,7 +85,7 @@ CHANGED="$(git -C "$TARGET" diff --name-only)"
 # 5. keep it all out of git
 EXCLUDE="$(git -C "$TARGET" rev-parse --git-common-dir)/info/exclude"
 case "$EXCLUDE" in /*|?:*) ;; *) EXCLUDE="$TARGET/$EXCLUDE" ;; esac
-grep -q "# ejad-fleet" "$EXCLUDE" 2>/dev/null || cat "$HERE/exclude.txt" >> "$EXCLUDE"
+grep -q "# wv-fleet" "$EXCLUDE" 2>/dev/null || cat "$HERE/exclude.txt" >> "$EXCLUDE"
 
 # 6. the /ejadtask command and the personal profile
 if [ "$DO_COMMAND" = 1 ]; then
@@ -82,15 +96,15 @@ if [ "$DO_COMMAND" = 1 ]; then
   # The approvals plugin, for /ejadtask's headless runs in any repo. Inactive unless EJAD_APPROVALS is set (or the
   # repo has worker-fleet), so ordinary OpenCode sessions are untouched.
   mkdir -p "$HOME/.config/opencode/plugins"
-  cp "$HERE/overlay/.opencode/plugins/ejad-approvals.js" "$HOME/.config/opencode/plugins/ejad-approvals.js"
-  # Headless runs in repos without worker-fleet use ejad-land.cjs from here.
-  mkdir -p "$HOME/.claude/ejad-fleet"
-  cp "$HERE/overlay/.claude/scripts/ejad-land.cjs" "$HOME/.claude/ejad-fleet/ejad-land.cjs"
+  cp "$HERE/overlay/.opencode/plugins/approvals.js" "$HOME/.config/opencode/plugins/approvals.js"
+  # Headless runs in repos without worker-fleet use land.cjs from here.
+  mkdir -p "$HOME/.claude/wv-fleet"
+  cp "$HERE/overlay/.claude/scripts/land.cjs" "$HOME/.claude/wv-fleet/land.cjs"
 fi
 
 echo
-echo "ejad-fleet installed into $TARGET"
+echo "wv-fleet installed into $TARGET"
 [ "${NEED_PROFILE:-0}" = 1 ] && echo "  -> fill in ~/.claude/ejadtask.json (your Plane / GitLab / Ejad HR ids and reviewers)"
 echo "  -> set Windows user env vars HR_EMAIL, HR_PASS, PLANE_API_KEY; log in with glab for your GitLab host"
-echo "  -> run: python3 .claude/scripts/selftest.py   (inside the target repo)"
-echo "  -> read README.md in ejad-fleet for the daily workflow"
+echo "  -> run: $PY3 .claude/scripts/selftest.py   (inside the target repo)"
+echo "  -> read README.md in wv-fleet for the daily workflow"

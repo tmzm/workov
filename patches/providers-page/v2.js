@@ -32,8 +32,8 @@
   async function load(force) {
     if (!state.loaded) skeleton();
     try {
-      var c = await api('/api/ejad/catalog' + (force ? '?refresh=1' : ''));
-      var p = await api('/api/ejad/providers');
+      var c = await api('/api/wv/catalog' + (force ? '?refresh=1' : ''));
+      var p = await api('/api/wv/providers');
       state.cat = c.providers || []; state.connected = c.connected || [];
       state.models = p.models || []; state.planner = p.planner || { runtime: 'claude', claude: 'sonnet' };
       state.loaded = true;
@@ -106,7 +106,7 @@
     var img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.className = 'pvp-logo';
     img.onload = function () { ltr.hidden = true; av.classList.add('logo'); av.style.background = ''; img.style.opacity = '1'; };
     img.onerror = function () { img.remove(); };
-    img.src = '/api/ejad/logo?id=' + encodeURIComponent(p.id); av.append(img);
+    img.src = '/api/wv/logo?id=' + encodeURIComponent(p.id); av.append(img);
     return av;
   }
   function fmtCtx(n) { return n >= 1e6 ? (n / 1e6).toFixed(n % 1e6 ? 1 : 0) + 'M' : Math.round(n / 1000) + 'K'; }
@@ -149,7 +149,7 @@
       var d = el('button', 'btn btn-sm pvp-danger', 'Disconnect'); d.type = 'button';
       d.onclick = async function () {
         if (!confirm('Disconnect ' + p.name + '? Agents using its models will fail until you switch them.')) return;
-        var x = await ejadPost({ action: 'ejad_disconnect_provider', provider: p.id });
+        var x = await wvPost({ action: 'wv_disconnect_provider', provider: p.id });
         toast(x.ok ? p.name + ' disconnected' : (x.j.error || 'Failed'), !x.ok); if (x.ok) { closeDialog(); load(); }
       };
       act.append(t, d);
@@ -159,7 +159,7 @@
       var go = async function () {
         if (!k.value.trim()) { k.focus(); return; }
         b.disabled = true; b.textContent = 'Connecting…';
-        var x = await ejadPost({ action: 'ejad_connect_provider', provider: p.id, key: k.value.trim() }); k.value = '';
+        var x = await wvPost({ action: 'wv_connect_provider', provider: p.id, key: k.value.trim() }); k.value = '';
         toast(x.ok ? p.name + ' connected (' + x.j.models + ' models). Press Test to check it.' : (x.j.error || 'Could not connect'), !x.ok);
         if (x.ok) { closeDialog(); load(); } else { b.disabled = false; b.textContent = 'Connect'; }
       };
@@ -237,7 +237,7 @@
     if (!ms.length) { toast('No models listed for ' + p.name + ' yet. Press Refresh list.', true); return; }
     var m = ms.filter(function (x) { return /-free$/.test(x); })[0] || ms[0];
     state.testing[p.id] = true; renderGrid();
-    var x = await ejadPost({ action: 'ejad_test_model', model: m });
+    var x = await wvPost({ action: 'wv_test_model', model: m });
     delete state.testing[p.id]; renderGrid();
     toast(x.ok ? (x.j.ok ? p.name + ' works (' + m + ')' : p.name + ' failed: ' + x.j.detail) : (x.j.error || 'Test failed'), !(x.ok && x.j.ok));
   }
@@ -268,14 +268,14 @@
 
   $('pvp-save').onclick = async function () {
     var v = $('pvp-planner').value, b = $('pvp-save'); b.disabled = true;
-    var x = await ejadPost({ action: 'ejad_set_planner', choice: v }); b.disabled = false;
+    var x = await wvPost({ action: 'wv_set_planner', choice: v }); b.disabled = false;
     toast(x.ok ? 'Planner is now ' + v + ' (next ticket plan)' : (x.j.error || 'Could not change the planner'), !x.ok); if (x.ok) load();
   };
   $('pvp-ptest').onclick = async function () {
     var v = $('pvp-planner').value; var b = $('pvp-ptest');
     if (v.indexOf('claude:') === 0) { toast('Claude runs on your Claude plan; nothing to test here.'); return; }
     b.disabled = true; b.textContent = 'Testing…';
-    var x = await ejadPost({ action: 'ejad_test_model', model: v });
+    var x = await wvPost({ action: 'wv_test_model', model: v });
     b.disabled = false; b.textContent = 'Test';
     toast(x.ok ? (x.j.ok ? v + ' works' : v + ' failed: ' + x.j.detail) : (x.j.error || 'Test failed'), !(x.ok && x.j.ok));
   };
@@ -285,6 +285,6 @@
   $('pvp-refresh').onclick = function () { load(true); };
   Array.prototype.forEach.call(document.querySelectorAll('#pvp .pvp-chip'), function (b) { b.onclick = function () { setFilter(b.dataset.f); }; });
 
-  window.ejadOpenProvidersPage = function () { var t = document.querySelector('.tab-btn[data-tab="providers"]'); if (t) t.click(); };
-  window.ejadProvidersShown = function () { showTab(store('mc.pvp.tab') || state.tab); load(); if (window.ejadAgentsLoad) window.ejadAgentsLoad(); };
+  window.wvOpenProvidersPage = function () { var t = document.querySelector('.tab-btn[data-tab="providers"]'); if (t) t.click(); };
+  window.wvProvidersShown = function () { showTab(store('mc.pvp.tab') || state.tab); load(); if (window.wvAgentsLoad) window.wvAgentsLoad(); };
 })();

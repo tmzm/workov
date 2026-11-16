@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>worker-fleet Workflow v3 — Complete Visual Guide & Fleet Control</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --bg-elev: #111827;
+      --bg-card: #161f33;
+      --bg-card-hover: #1c2842;
+      --border: #26334d;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+      --purple: #a78bfa;
+      --purple-soft: rgba(167, 139, 250, 0.15);
+      --emerald: #34d399;
+      --emerald-soft: rgba(52, 211, 153, 0.14);
+      --amber: #fbbf24;
+      --amber-soft: rgba(251, 191, 36, 0.14);
+      --rose: #fb7185;
+      --rose-soft: rgba(251, 113, 133, 0.15);
+      --code-bg: #070a12;
+      --radius: 14px;
+      --shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.08), transparent 35%),
+        radial-gradient(circle at 88% 10%, rgba(167, 139, 250, 0.08), transparent 35%),
+        var(--bg);
+      min-height: 100vh;
+      padding-bottom: 4rem;
+    }
+
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: rgba(11, 15, 25, 0.85);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      color: #090d16;
+      font-weight: 800;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      letter-spacing: 0.04em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+      max-width: 100%;
+      padding-bottom: 2px;
+    }
+
+    .nav-links::-webkit-scrollbar { display: none; }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.4rem 0.75rem;
+      border-radius: 8px;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      background: var(--bg-card);
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    .hero {
+      padding: 3.5rem 0 2.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 0.3rem 0.8rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    .hero h1 {
+      font-size: 2.75rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+      max-width: 900px;
+    }
+
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 50%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 820px;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .kpi-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+
+    .kpi-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .kpi-label code {
+      font-size: 0.8rem;
+      background: var(--code-bg);
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      color: var(--accent);
+    }
+
+    section {
+      padding: 3.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-header { margin-bottom: 2.25rem; }
+
+    .section-eyebrow {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--purple);
+      margin-bottom: 0.4rem;
+    }
+
+    .section-title {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .section-desc {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 760px;
+    }
+
+    .diagram-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      overflow-x: auto;
+    }
+
+    .responsive-svg {
+      width: 100%;
+      height: auto;
+      min-width: 900px;
+      display: block;
+    }
+
+    .diagram-caption {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.35rem;
+      transition: all 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .feature-card h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .feature-card p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .agent-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+    }
+
+    .agent-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .agent-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text);
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .badge-opus { background: var(--purple-soft); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+    .badge-sonnet { background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(56,189,248,0.3); }
+    .badge-skill { background: var(--emerald-soft); color: var(--emerald); border: 1px solid rgba(52,211,153,0.3); }
+    .badge-hotfix { background: var(--rose-soft); color: var(--rose); border: 1px solid rgba(251,113,133,0.3); }
+    .badge-warn { background: var(--amber-soft); color: var(--amber); border: 1px solid rgba(251,191,36,0.3); }
+
+    .agent-desc {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-bottom: 1.25rem;
+    }
+
+    .agent-meta {
+      font-size: 0.8rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--accent);
+      padding-top: 0.75rem;
+      border-top: 1px solid rgba(38, 51, 77, 0.6);
+    }
+
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .step-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+    }
+
+    .step-head {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .step-num {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .step-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .step-body p {
+      font-size: 0.96rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    .code-wrap {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+
+    .code-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 1rem;
+      background: rgba(22, 31, 51, 0.6);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      background: var(--bg-card);
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    pre {
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #e2e8f0;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 1rem 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--code-bg);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      text-align: left;
+    }
+
+    th {
+      background: var(--bg-card);
+      padding: 0.75rem 1rem;
+      font-weight: 700;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid rgba(38, 51, 77, 0.4);
+      color: var(--text-muted);
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .status-pill {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: ui-monospace, monospace;
+      text-transform: uppercase;
+    }
+    .st-ready { background: var(--accent-soft); color: var(--accent); }
+    .st-done { background: var(--emerald-soft); color: var(--emerald); }
+    .st-blocked { background: var(--rose-soft); color: var(--rose); }
+
+    .v-timeline {
+      position: relative;
+      padding-left: 2rem;
+      margin-top: 2rem;
+    }
+
+    .v-timeline::before {
+      content: '';
+      position: absolute;
+      top: 10px;
+      bottom: 10px;
+      left: 7px;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .v-item {
+      position: relative;
+      margin-bottom: 2rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+
+    .v-item:last-child { margin-bottom: 0; }
+
+    .v-dot {
+      position: absolute;
+      top: 1.75rem;
+      left: -2.35rem;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 3px solid var(--accent);
+      box-shadow: 0 0 0 4px var(--bg);
+    }
+
+    .v-dot.hotfix { border-color: var(--rose); }
+    .v-dot.newfeat { border-color: var(--emerald); }
+    .v-dot.warn { border-color: var(--amber); }
+
+    .v-time {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      margin-bottom: 0.35rem;
+    }
+
+    .v-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .v-desc {
+      font-size: 0.94rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    footer {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 640px) {
+      .hero { padding: 2.25rem 0 1.75rem; }
+      .step-card, .v-item { padding: 1.15rem; }
+      .v-timeline { padding-left: 1.25rem; }
+      .v-dot { left: -1.85rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="nav-inner">
+      <a href="#top" class="brand">
+        <span class="brand-badge">WORKER-FLEET v3</span>
+        <span>Workflow &amp; Fleet Control Guide</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#architecture">Architecture</a>
+        <a href="#presets">Multi-Harness &amp; /setup</a>
+        <a href="#agents">Skills &amp; Agents</a>
+        <a href="#dashboard">Fleet Control (:3080)</a>
+        <a href="#steps">Step-by-Step Setup</a>
+        <a href="#timeline">Evolution Timeline</a>
+        <a href="#hotfix">Hotfix &amp; Unblocking</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" id="top">
+
+    <div class="hero">
+      <div class="pill">worker-fleet Workflow v3 • Claude Code + OpenCode + ChatGPT/Codex</div>
+      <h1>Multi-Harness Orchestration. <span>Fleet Control Live.</span></h1>
+      <p>
+        Instead of juggling multiple disjointed terminals across different AI tools, orchestrate everything through a unified <strong>Router</strong> agent or monitor your fleet in real time via the <strong>Fleet Control Dashboard (:3080)</strong>. Dispatches self-contained feature tickets across <strong>Claude Code</strong>, <strong>OpenCode</strong>, and <strong>Codex CLI</strong> into isolated Git worktrees, tracks token telemetry on disk, and lets you approve and unblock tickets directly from your mobile phone.
+      </p>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-value">2 Skills + 8 Agents</div>
+          <div class="kpi-label"><code>/write-tickets</code>, <code>/setup</code> + Router, Watchdog, Worker, Teammate, Tester, Reviewer, Merger, Checker &amp; Reproducer</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value">Multi-Harness</div>
+          <div class="kpi-label">Claude Code, OpenCode (<code>opencode</code>), and OpenAI Codex CLI (<code>codex</code>)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value">Fleet Control :3080</div>
+          <div class="kpi-label">Live Kanban, Worktree Matrix, Screenshot Lightbox, and Token Telemetry via Cloudflare Tunnel</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value">Zero Conflict Ports</div>
+          <div class="kpi-label">Main on <code>:3000</code>, Dashboard on <code>:3080</code>, Reproducer on <code>:3090</code>, Workers on <code>:3101+</code></div>
+        </div>
+      </div>
+    </div>
+
+    <section id="architecture">
+      <div class="section-header">
+        <div class="section-eyebrow">Visual Architecture</div>
+        <h2 class="section-title">How the worker-fleet Ecosystem Fits Together (v3)</h2>
+        <p class="section-desc">
+          The diagram below illustrates the three unified pillars of v3: Spec &amp; Multi-Harness Configuration (Phase 1), Autonomous Worktree Execution with hybrid CLI delegation (Phase 2), and the Live Fleet Control Telemetry &amp; Remote Tunnel (Phase 3).
+        </p>
+      </div>
+
+      <div class="diagram-card">
+        <svg class="responsive-svg" viewBox="0 0 1140 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="worker-fleet v3 Architecture Diagram">
+          <defs>
+            <linearGradient id="gradRouter" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.25"/>
+            </linearGradient>
+            <linearGradient id="gradDash" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#34d399" stop-opacity="0.2"/>
+            </linearGradient>
+            <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+            </marker>
+            <marker id="arrowPurple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#a78bfa" />
+            </marker>
+            <marker id="arrowEmerald" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399" />
+            </marker>
+            <marker id="arrowRose" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#fb7185" />
+            </marker>
+            <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#fbbf24" />
+            </marker>
+          </defs>
+
+          <rect x="15" y="15" width="245" height="530" rx="14" fill="#111827" stroke="#26334d" stroke-dasharray="6 4"/>
+          <text x="32" y="42" fill="#34d399" font-size="12" font-weight="700" letter-spacing="1">PHASE 1: SPEC &amp; CONFIG</text>
+
+          <rect x="35" y="65" width="205" height="64" rx="10" fill="#161f33" stroke="#38bdf8" stroke-width="2"/>
+          <text x="137" y="91" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="700">Developer (CLI / Phone)</text>
+          <text x="137" y="111" text-anchor="middle" fill="#94a3b8" font-size="10.5">Reviews Board • Sets Config</text>
+
+          <rect x="35" y="150" width="205" height="74" rx="10" fill="#161f33" stroke="#a78bfa" stroke-width="2"/>
+          <text x="137" y="174" text-anchor="middle" fill="#a78bfa" font-size="12.5" font-weight="700">/setup (Skill)</text>
+          <text x="137" y="193" text-anchor="middle" fill="#e2e8f0" font-size="10.5">CLI Presets • Concurrency</text>
+          <text x="137" y="210" text-anchor="middle" fill="#94a3b8" font-size="9.5">apply-setup.py -&gt; opencode.json</text>
+
+          <rect x="35" y="245" width="205" height="74" rx="10" fill="#161f33" stroke="#34d399" stroke-width="2"/>
+          <text x="137" y="269" text-anchor="middle" fill="#34d399" font-size="12.5" font-weight="700">/write-tickets (Skill)</text>
+          <text x="137" y="288" text-anchor="middle" fill="#e2e8f0" font-size="10.5">1-by-1 Interview until 0 ambiguity</text>
+          <text x="137" y="305" text-anchor="middle" fill="#94a3b8" font-size="9.5">Writes rd.md + eval.md</text>
+
+          <rect x="35" y="340" width="205" height="185" rx="10" fill="#0b0f19" stroke="#26334d" stroke-width="1.5"/>
+          <text x="137" y="364" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700">Single Source of Truth</text>
+          <rect x="48" y="376" width="179" height="30" rx="6" fill="#161f33" stroke="#a78bfa"/>
+          <text x="137" y="396" text-anchor="middle" fill="#e9d5ff" font-size="10" font-family="monospace">worker-fleet.config.json</text>
+          <rect x="48" y="414" width="179" height="30" rx="6" fill="#161f33" stroke="#38bdf8"/>
+          <text x="137" y="434" text-anchor="middle" fill="#bae6fd" font-size="10" font-family="monospace">BOARD.md (draft|ready|done)</text>
+          <rect x="48" y="452" width="179" height="60" rx="6" fill="#161f33" stroke="#26334d"/>
+          <text x="137" y="474" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="monospace">NNN-slug/rd.md + eval.md</text>
+          <text x="137" y="493" text-anchor="middle" fill="#94a3b8" font-size="9">CLI + agent-browser specs</text>
+
+          <rect x="275" y="15" width="555" height="530" rx="14" fill="#111827" stroke="#26334d" stroke-dasharray="6 4"/>
+          <text x="295" y="42" fill="#38bdf8" font-size="12" font-weight="700" letter-spacing="1">PHASE 2: MULTI-HARNESS ROUTER &amp; WORKTREES</text>
+
+          <rect x="295" y="65" width="270" height="95" rx="12" fill="url(#gradRouter)" stroke="#a78bfa" stroke-width="2.5"/>
+          <text x="430" y="90" text-anchor="middle" fill="#f1f5f9" font-size="14" font-weight="800">router (Opus / GPT-5)</text>
+          <text x="430" y="108" text-anchor="middle" fill="#e2e8f0" font-size="10.5">Claude Code or opencode --agent router</text>
+          <text x="430" y="125" text-anchor="middle" fill="#bae6fd" font-size="10">• Auto-starts watchdog + Fleet Control</text>
+          <text x="430" y="141" text-anchor="middle" fill="#bae6fd" font-size="10">• Dispatches ready tickets</text>
+
+          <rect x="585" y="65" width="230" height="95" rx="10" fill="#161f33" stroke="#fbbf24" stroke-width="2"/>
+          <text x="700" y="90" text-anchor="middle" fill="#fbbf24" font-size="12.5" font-weight="700">watchdog (Sonnet / Mini)</text>
+          <text x="700" y="108" text-anchor="middle" fill="#e2e8f0" font-size="10.5">Runs every 10 mins on :3080 &amp; dev ports</text>
+          <text x="700" y="125" text-anchor="middle" fill="#94a3b8" font-size="9.5">Alerts router on &gt;15m stalls or file drift</text>
+          <text x="700" y="141" text-anchor="middle" fill="#94a3b8" font-size="9.5">autoCompactWindow: 150000</text>
+
+          <line x1="565" y1="112" x2="579" y2="112" stroke="#fbbf24" stroke-width="2" marker-start="url(#arrowAmber)" marker-end="url(#arrowAmber)"/>
+
+          <rect x="295" y="180" width="375" height="185" rx="10" fill="#161f33" stroke="#38bdf8" stroke-width="1.8"/>
+          <text x="482" y="202" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">Parallel Worktree Fleet + Hybrid Bridge</text>
+
+          <rect x="310" y="215" width="165" height="75" rx="8" fill="#0b0f19" stroke="#26334d"/>
+          <text x="392" y="234" text-anchor="middle" fill="#f1f5f9" font-size="11.5" font-weight="700">worker (Solo)</text>
+          <text x="392" y="251" text-anchor="middle" fill="#38bdf8" font-size="9.5" font-family="monospace">Ports :3101..:3104</text>
+          <text x="392" y="267" text-anchor="middle" fill="#94a3b8" font-size="9">delegate-task.sh -&gt; codex</text>
+
+          <rect x="490" y="215" width="165" height="75" rx="8" fill="#0b0f19" stroke="#26334d"/>
+          <text x="572" y="234" text-anchor="middle" fill="#f1f5f9" font-size="11.5" font-weight="700">teammate (Team)</text>
+          <text x="572" y="251" text-anchor="middle" fill="#a78bfa" font-size="9.5" font-family="monospace">contract.md locked</text>
+          <text x="572" y="267" text-anchor="middle" fill="#94a3b8" font-size="9">FE + BE + QA teammates</text>
+
+          <rect x="310" y="300" width="345" height="50" rx="7" fill="#1e293b" stroke="#34d399"/>
+          <text x="482" y="322" text-anchor="middle" fill="#34d399" font-size="11" font-weight="700">tester (agent-browser)  +  reviewer (diff audit)</text>
+          <text x="482" y="338" text-anchor="middle" fill="#94a3b8" font-size="9.5">Saves screenshots to evidence/ • Second opinion via Codex CLI</text>
+
+          <line x1="430" y1="160" x2="430" y2="175" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+          <rect x="295" y="390" width="170" height="75" rx="8" fill="#161f33" stroke="#34d399" stroke-width="2"/>
+          <text x="380" y="415" text-anchor="middle" fill="#34d399" font-size="12" font-weight="700">merger.md</text>
+          <text x="380" y="433" text-anchor="middle" fill="#e2e8f0" font-size="9.5">Merges to main, tests build</text>
+          <text x="380" y="449" text-anchor="middle" fill="#94a3b8" font-size="9">Marks BOARD.md = done</text>
+
+          <rect x="480" y="390" width="190" height="75" rx="8" fill="#161f33" stroke="#38bdf8" stroke-width="2"/>
+          <text x="575" y="415" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">checker.md (:3000)</text>
+          <text x="575" y="433" text-anchor="middle" fill="#e2e8f0" font-size="9.5">Post-merge smoke test on main</text>
+          <text x="575" y="449" text-anchor="middle" fill="#94a3b8" font-size="9">Reports breaks reproduced 2x</text>
+
+          <rect x="685" y="215" width="130" height="250" rx="8" fill="#161f33" stroke="#fb7185" stroke-width="2"/>
+          <text x="750" y="240" text-anchor="middle" fill="#fb7185" font-size="11.5" font-weight="700">reproducer</text>
+          <text x="750" y="258" text-anchor="middle" fill="#bae6fd" font-size="9.5" font-family="monospace">Port :3090</text>
+          <text x="750" y="280" text-anchor="middle" fill="#94a3b8" font-size="9">Reproduces 2x</text>
+          <text x="750" y="310" text-anchor="middle" fill="#34d399" font-size="9.5" font-weight="700">Small Fix?</text>
+          <text x="750" y="325" text-anchor="middle" fill="#94a3b8" font-size="8.5">Fixes on branch</text>
+          <text x="750" y="360" text-anchor="middle" fill="#fbbf24" font-size="9.5" font-weight="700">Broad Bug?</text>
+          <text x="750" y="375" text-anchor="middle" fill="#94a3b8" font-size="8.5">NEEDS_TICKET</text>
+
+          <rect x="845" y="15" width="280" height="530" rx="14" fill="#111827" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="865" y="42" fill="#38bdf8" font-size="12" font-weight="700" letter-spacing="1">PHASE 3: FLEET CONTROL (:3080)</text>
+
+          <rect x="860" y="65" width="250" height="120" rx="10" fill="url(#gradDash)" stroke="#38bdf8" stroke-width="2"/>
+          <text x="985" y="92" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="800">dashboard-server.py</text>
+          <text x="985" y="110" text-anchor="middle" fill="#38bdf8" font-size="10.5">Port :3080 (Stdlib Python)</text>
+          <text x="985" y="128" text-anchor="middle" fill="#e2e8f0" font-size="9.5">• Serves reactive index.html</text>
+          <text x="985" y="145" text-anchor="middle" fill="#e2e8f0" font-size="9.5">• Checks TCP ports &amp; worktree status</text>
+          <text x="985" y="162" text-anchor="middle" fill="#34d399" font-size="9.5">• Telemetry parser: Claude + OpenCode + Codex</text>
+
+          <rect x="860" y="200" width="250" height="155" rx="10" fill="#161f33" stroke="#26334d"/>
+          <text x="985" y="224" text-anchor="middle" fill="#f1f5f9" font-size="11.5" font-weight="700">Core Dashboard Views</text>
+          <text x="985" y="246" text-anchor="middle" fill="#bae6fd" font-size="10">1. Live Kanban &amp; Worktree Matrix</text>
+          <text x="985" y="266" text-anchor="middle" fill="#bae6fd" font-size="10">2. Screenshot Evidence Lightbox</text>
+          <text x="985" y="286" text-anchor="middle" fill="#bae6fd" font-size="10">3. Multi-Harness Token &amp; Cost Telemetry</text>
+          <text x="985" y="306" text-anchor="middle" fill="#bae6fd" font-size="10">4. Dev Server Port Status &amp; Watchdog Logs</text>
+          <text x="985" y="332" text-anchor="middle" fill="#34d399" font-size="9.5" font-weight="600">Zero Node/NPM dependencies</text>
+
+          <rect x="860" y="370" width="250" height="155" rx="10" fill="#161f33" stroke="#a78bfa" stroke-width="2"/>
+          <text x="985" y="395" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="700">Mobile Cloudflare Tunnel / ngrok</text>
+          <text x="985" y="415" text-anchor="middle" fill="#e2e8f0" font-size="10">start-dashboard.sh renders QR code</text>
+          <rect x="880" y="428" width="210" height="50" rx="6" fill="#0b0f19" stroke="#38bdf8"/>
+          <text x="985" y="448" text-anchor="middle" fill="#38bdf8" font-size="9.5" font-family="monospace">https://*.trycloudflare.com</text>
+          <text x="985" y="465" text-anchor="middle" fill="#34d399" font-size="9">?token=auth-pin-code</text>
+          <text x="985" y="500" text-anchor="middle" fill="#94a3b8" font-size="9.5">Remote Actions: Approve ready • Unblock worker</text>
+
+          <line x1="240" y1="98" x2="289" y2="98" stroke="#38bdf8" stroke-width="2" marker-start="url(#arrowBlue)" marker-end="url(#arrowBlue)"/>
+          <path d="M 670 240 L 855 240" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrowBlue)"/>
+          <path d="M 770 120 L 855 120" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrowBlue)"/>
+        </svg>
+        <div class="diagram-caption">
+          Figure 1: Complete worker-fleet Workflow v3 architecture spanning Phase 1 (Spec &amp; Config), Phase 2 (Multi-Harness Autonomous Execution), and Phase 3 (Live Fleet Control Dashboard &amp; Mobile Tunnel).
+        </div>
+      </div>
+    </section>
+
+    <section id="presets">
+      <div class="section-header">
+        <div class="section-eyebrow">Multi-Model Flexibility</div>
+        <h2 class="section-title">Multi-Harness Architecture &amp; The <code>/setup</code> Skill</h2>
+        <p class="section-desc">
+          Different tasks demand different model balances. worker-fleet v3 lets you run on <strong>Claude Code</strong>, <strong>OpenCode</strong>, or hybrid delegation with <strong>OpenAI Codex CLI</strong> with 4 battle-tested presets or your own custom role mapping.
+        </p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Preset Name</th>
+              <th>Target Harness</th>
+              <th><code>router</code> (Orchestrator)</th>
+              <th><code>worker</code> &amp; <code>teammate</code></th>
+              <th><code>reproducer</code> &amp; <code>reviewer</code></th>
+              <th><code>watchdog</code>, <code>tester</code>, <code>merger</code></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong><code>hybrid-bridge</code></strong> <span class="badge badge-opus">Recommended</span></td>
+              <td>Claude Code + Codex</td>
+              <td>Claude <code>opus</code> (High)</td>
+              <td>Claude <code>sonnet</code> (High)</td>
+              <td>Claude <code>sonnet</code> + <code>codex exec</code> review</td>
+              <td>Claude <code>sonnet</code> (Medium)</td>
+            </tr>
+            <tr>
+              <td><strong><code>claude-default</code></strong></td>
+              <td>Claude Code</td>
+              <td>Claude <code>opus</code> (High)</td>
+              <td>Claude <code>sonnet</code> (High)</td>
+              <td>Claude <code>sonnet</code> (High)</td>
+              <td>Claude <code>sonnet</code> (Medium)</td>
+            </tr>
+            <tr>
+              <td><strong><code>deepseek-lean</code></strong></td>
+              <td>Claude Code / OpenCode</td>
+              <td><code>sonnet</code> / <code>deepseek-chat</code></td>
+              <td><code>sonnet</code> / <code>deepseek-reasoner</code></td>
+              <td><code>sonnet</code> / <code>deepseek-reasoner</code></td>
+              <td><code>haiku</code> / <code>deepseek-chat</code></td>
+            </tr>
+            <tr>
+              <td><strong><code>opencode-openai</code></strong></td>
+              <td>OpenCode (<code>opencode</code>)</td>
+              <td>OpenAI <code>gpt-5</code> (High)</td>
+              <td>OpenAI <code>gpt-5</code> (Medium)</td>
+              <td>OpenAI <code>o3</code> (High)</td>
+              <td>OpenAI <code>gpt-4.1-mini</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>⚡ One-Shot or Interactive <code>/setup</code></h4>
+          <p>
+            Run <code>/setup</code> with no flags to interview you one question at a time (Harness &rarr; Preset &rarr; Concurrency &rarr; Dashboard), or pass key-value flags in one shot:
+          </p>
+          <div class="code-wrap">
+            <pre><code>/setup harness=both preset=hybrid-bridge max_workers=4 dashboard=on tunnel=cloudflared</code></pre>
+          </div>
+        </div>
+        <div class="feature-card">
+          <h4>🔄 Deterministic OpenCode Sync</h4>
+          <p>
+            Running <code>.claude/scripts/apply-setup.py</code> automatically generates <code>opencode.json</code> (with <code>{file:.opencode/agents/...}</code> prompt bindings) and all 9 subagent files inside <code>.opencode/agents/*.md</code>.
+          </p>
+        </div>
+        <div class="feature-card">
+          <h4>🌉 Codex CLI Delegation Bridge</h4>
+          <p>
+            When hybrid review is enabled, <code>worker</code> and <code>reviewer</code> agents call <code>.claude/scripts/delegate-task.sh codex review</code> to automatically capture your <code>git diff</code> for a second-opinion pass via OpenAI Codex CLI.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="agents">
+      <div class="section-header">
+        <div class="section-eyebrow">Component Roster</div>
+        <h2 class="section-title">The 2 Skills &amp; 8 Specialized Agents</h2>
+        <p class="section-desc">
+          Each agent has a strict single responsibility and tailored model settings so you don't burn Opus tokens on routine implementation or background monitoring.
+        </p>
+      </div>
+
+      <div class="agent-grid">
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">/setup</span>
+            <span class="badge badge-skill">Skill</span>
+          </div>
+          <div class="agent-desc">
+            Configures CLI harness, model presets, concurrency, dev ports, and Fleet Control Dashboard. Updates <code>specs/worker-fleet.config.json</code> and runs <code>apply-setup.py</code>.
+          </div>
+          <div class="agent-meta">Path: .claude/skills/setup/SKILL.md</div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">/write-tickets</span>
+            <span class="badge badge-skill">Skill</span>
+          </div>
+          <div class="agent-desc">
+            Reads your codebase and interviews you <strong>one question at a time</strong> until zero ambiguity remains. Generates numbered ticket folders (<code>rd.md</code> + <code>eval.md</code>) and updates <code>specs/tickets/BOARD.md</code>.
+          </div>
+          <div class="agent-meta">Path: .claude/skills/write-tickets/SKILL.md</div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">router</span>
+            <span class="badge badge-opus">Opus / GPT-5 • Orchestrator</span>
+          </div>
+          <div class="agent-desc">
+            Your single chat interface. Starts <code>watchdog</code> and Fleet Control at Step 0, dispatches <code>ready</code> tickets from <code>BOARD.md</code>, checks <code>results.md</code>, and forwards mobile <code>user-decision.md</code> unblocks.
+          </div>
+          <div class="agent-meta">Port: N/A (Never edits application code)</div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">watchdog</span>
+            <span class="badge badge-warn">Sonnet / Mini • 150k Compact</span>
+          </div>
+          <div class="agent-desc">
+            Runs in the background every 10 minutes via <code>watchdog-check.sh</code>. Alerts <code>@main</code> if a worker goes silent (&gt;15m), loops on an error, edits a <code>## Do not touch</code> file, or receives a mobile decision.
+          </div>
+          <div class="agent-meta">Setting: autoCompactWindow: 150000</div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">worker</span>
+            <span class="badge badge-sonnet">Sonnet • Worktree</span>
+          </div>
+          <div class="agent-desc">
+            Builds one <code>solo</code> ticket inside an isolated Git worktree. Updates <code>job/status.json</code>, runs <code>tester</code> and <code>reviewer</code> (with optional Codex CLI bridge), writes <code>results.md</code> + <code>evidence/</code>, and commits.
+          </div>
+          <div class="agent-meta">Ports: :3101, :3102, :3103... (Accounts t001+)</div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">teammate</span>
+            <span class="badge badge-sonnet">Sonnet • Agent Team</span>
+          </div>
+          <div class="agent-desc">
+            Used for foundational or multi-surface <code>team</code> tickets. Teammates first negotiate and lock shared schemas/APIs in <code>contract.md</code> before building their assigned areas in parallel.
+          </div>
+          <div class="agent-meta">Requires: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">tester &amp; reviewer</span>
+            <span class="badge badge-sonnet">Sonnet • QA Pair</span>
+          </div>
+          <div class="agent-desc">
+            Spawned by each worker before committing. <code>tester</code> executes every check in <code>eval.md</code> via <code>agent-browser</code> and saves screenshots to <code>evidence/</code>; <code>reviewer</code> audits <code>git diff</code> against <code>rd.md</code>.
+          </div>
+          <div class="agent-meta">Read-Only Verification Subagents</div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">merger &amp; checker</span>
+            <span class="badge badge-sonnet">Sonnet • Integration</span>
+          </div>
+          <div class="agent-desc">
+            <code>merger</code> lands verified branches onto <code>main</code>, runs lint/build, and marks <code>BOARD.md</code> as <code>done</code>. <code>checker</code> then smoke-tests <code>main</code> on port <code>:3000</code> like a first-time user.
+          </div>
+          <div class="agent-meta">Main Checkout • Port :3000 (Account t000)</div>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-top">
+            <span class="agent-name">reproducer</span>
+            <span class="badge badge-hotfix">Sonnet / o3 • Hotfix :3090</span>
+          </div>
+          <div class="agent-desc">
+            Triggered on live bug reports or <code>checker</code> failures. Reproduces the bug twice in an isolated worktree on <code>:3090</code>, auto-fixes localized bugs (1–3 files) on its own branch, or files a root-cause report.
+          </div>
+          <div class="agent-meta">Worktree Isolation • Port :3090 (Account t090)</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="dashboard">
+      <div class="section-header">
+        <div class="section-eyebrow">Real-Time Observability</div>
+        <h2 class="section-title">Fleet Control Dashboard (:3080) &amp; Mobile Tunnel</h2>
+        <p class="section-desc">
+          Monitor your parallel worktrees, review visual browser evidence, inspect multi-harness token telemetry, and approve tickets from your phone without opening a terminal.
+        </p>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>📊 1. Live Kanban &amp; Worktree Matrix</h4>
+          <p>
+            Polls <code>/api/state</code> every 3s. Shows tickets in <code>draft</code>, <code>ready</code>, <code>in-progress</code>, <code>blocked</code>, and <code>done</code>. Real-time worker cards display assigned port, TCP connection health, phase, and heartbeat stall warnings (&gt;15m).
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h4>📷 2. Visual Evidence Gallery</h4>
+          <p>
+            Clicking any ticket opens a slide-over drawer with 5 tabs: Requirements (<code>rd.md</code> + <code>user-decision.md</code>), Evaluation (<code>eval.md</code>), Contract (<code>contract.md</code>), Results &amp; Git Commits (<code>results.md</code>), and a full-screen screenshot lightbox.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h4>💎 3. Multi-Harness Token Telemetry</h4>
+          <p>
+            Zero external API keys required! Directly parses session logs from disk:
+            Claude Code (<code>~/.claude/projects/</code>), OpenCode SQLite (<code>opencode.db</code>), and Codex rollout files (<code>~/.codex/sessions/</code>). Calculates total cost, role consumption, and prompt cache savings.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h4>📱 4. PIN-Protected Mobile Unblocking</h4>
+          <p>
+            Accessed via Cloudflare Quick Tunnel or ngrok. Allows you to flip tickets from <code>draft</code> &rarr; <code>ready</code> or answer questions for <code>blocked</code> workers by writing <code>user-decision.md</code> and transitioning their status from your phone.
+          </p>
+        </div>
+      </div>
+
+      <div class="step-card" style="margin-top: 1.5rem;">
+        <div class="step-head">
+          <span class="step-num">⚡</span>
+          <h3 class="step-title">How to Launch Fleet Control &amp; Mobile Tunnel</h3>
+        </div>
+        <div class="step-body">
+          <p>
+            Run the dashboard launcher script in your terminal. It boots the Python server on <code>:3080</code>, connects the tunnel, and prints an interactive ASCII QR code:
+          </p>
+          <div class="code-wrap">
+            <div class="code-bar">
+              <span>bash — Start Dashboard &amp; Tunnel</span>
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code>bash .claude/scripts/start-dashboard.sh</code></pre>
+          </div>
+          <p>
+            Scan the terminal QR code with your mobile camera to open <code>https://xxxx.trycloudflare.com/?token=...</code> instantly.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="steps">
+      <div class="section-header">
+        <div class="section-eyebrow">Step-by-Step Guide</div>
+        <h2 class="section-title">How to Install &amp; Run the Workflow (v3)</h2>
+        <p class="section-desc">
+          Follow these 5 steps to configure your environment, generate tickets, and start autonomous parallel builds.
+        </p>
+      </div>
+
+      <div class="steps-list">
+        <div class="step-card">
+          <div class="step-head">
+            <span class="step-num">1</span>
+            <h3 class="step-title">Install into Your Repo &amp; Install Prerequisites</h3>
+          </div>
+          <div class="step-body">
+            <p>
+              Run the installer from a worker-fleet checkout against your existing repository (it copies the workflow files, backs up anything it would overwrite, and creates the <code>specs/</code> skeleton), then install Vercel's <code>agent-browser</code> CLI for automated UI verification:
+            </p>
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>bash — Terminal in project root</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>bash .claude/scripts/install.sh /path/to/your-repo
+npm install -g agent-browser</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-head">
+            <span class="step-num">2</span>
+            <h3 class="step-title">Configure Your Environment with <code>/setup</code></h3>
+          </div>
+          <div class="step-body">
+            <p>
+              Launch your CLI and run <code>/setup</code> to pick your CLI harness and model preset:
+            </p>
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>Claude Code / OpenCode Prompt</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>/setup harness=both preset=hybrid-bridge max_workers=4 dashboard=on tunnel=cloudflared</code></pre>
+            </div>
+            <p>
+              This writes <code>specs/worker-fleet.config.json</code>, updates <code>.claude/agents/*.md</code>, generates <code>opencode.json</code> + <code>.opencode/agents/*.md</code>, and creates the dashboard auth token.
+            </p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-head">
+            <span class="step-num">3</span>
+            <h3 class="step-title">Generate Tickets Using <code>/write-tickets</code></h3>
+          </div>
+          <div class="step-body">
+            <p>
+              Describe your features in plain English or reference your PRD file:
+            </p>
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>Claude Code / OpenCode Prompt</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>/write-tickets Write tickets for all features in specs/PRD.md</code></pre>
+            </div>
+            <p>
+              Answer the skill's clarifying questions one at a time. It populates <code>specs/tickets/NNN-slug/rd.md</code>, <code>eval.md</code>, and updates <code>specs/tickets/BOARD.md</code> with status <code>draft</code>.
+            </p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-head">
+            <span class="step-num">4</span>
+            <h3 class="step-title">Launch Fleet Control Dashboard &amp; Approve Tickets</h3>
+          </div>
+          <div class="step-body">
+            <p>
+              Start Fleet Control in the background:
+            </p>
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>bash — Terminal in project root</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>bash .claude/scripts/start-dashboard.sh</code></pre>
+            </div>
+            <p>
+              Open <code>http://127.0.0.1:3080</code> (or scan the mobile QR code) and click <strong>Approve &amp; Mark Ready</strong> on tickets you want to dispatch, or tell your AI assistant:
+            </p>
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>CLI Prompt</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>Mark tickets 001, 002, and 003 as ready in specs/tickets/BOARD.md</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-head">
+            <span class="step-num">5</span>
+            <h3 class="step-title">Launch the Autonomous <code>router</code> Session</h3>
+          </div>
+          <div class="step-body">
+            <p>
+              Start your chosen CLI harness as the <code>router</code> orchestrator:
+            </p>
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>Option A: Claude Code CLI</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>claude --agent router --name router --permission-mode auto</code></pre>
+            </div>
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>Option B: OpenCode CLI</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>opencode --agent router</code></pre>
+            </div>
+            <p>Inside the router chat, kick off the autonomous build:</p>
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>Router Prompt</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>Start building all ready tickets on the board.</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="timeline">
+      <div class="section-header">
+        <div class="section-eyebrow">Project Lifecycle &amp; Evolution</div>
+        <h2 class="section-title">How the Workflow Evolves Over Time</h2>
+        <p class="section-desc">
+          Real software isn't built in a single batch. Below is the complete lifecycle showing how <code>BOARD.md</code>, your Git branches, the agents, and Fleet Control evolve from Day 1 foundation to parallel sprints, mid-flight hotfixes, and future feature requests.
+        </p>
+      </div>
+
+      <div class="diagram-card">
+        <svg class="responsive-svg" viewBox="0 0 980 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Project Evolution Timeline Diagram">
+          <line x1="60" y1="95" x2="920" y2="95" stroke="#26334d" stroke-width="4"/>
+
+          <circle cx="105" cy="95" r="14" fill="#0b0f19" stroke="#a78bfa" stroke-width="4"/>
+          <text x="105" y="55" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="700">T1 • DAY 1 AM</text>
+          <rect x="30" y="122" width="150" height="96" rx="8" fill="#161f33" stroke="#26334d"/>
+          <text x="105" y="144" text-anchor="middle" fill="#f1f5f9" font-size="11.5" font-weight="700">Initial PRD &amp; /setup</text>
+          <text x="105" y="163" text-anchor="middle" fill="#94a3b8" font-size="10">Configure hybrid preset.</text>
+          <text x="105" y="179" text-anchor="middle" fill="#94a3b8" font-size="10">001 locks contract.md,</text>
+          <text x="105" y="195" text-anchor="middle" fill="#34d399" font-size="10" font-family="monospace">merges to main.</text>
+
+          <circle cx="295" cy="95" r="14" fill="#0b0f19" stroke="#38bdf8" stroke-width="4"/>
+          <text x="295" y="55" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="700">T2 • DAY 1 PM</text>
+          <rect x="220" y="122" width="150" height="96" rx="8" fill="#161f33" stroke="#26334d"/>
+          <text x="295" y="144" text-anchor="middle" fill="#f1f5f9" font-size="11.5" font-weight="700">Parallel Unblocking</text>
+          <text x="295" y="163" text-anchor="middle" fill="#94a3b8" font-size="10">001 done -&gt; unblocks</text>
+          <text x="295" y="179" text-anchor="middle" fill="#38bdf8" font-size="10" font-family="monospace">002 (:3101) &amp; 003 (:3102)</text>
+          <text x="295" y="195" text-anchor="middle" fill="#94a3b8" font-size="10">simultaneously.</text>
+
+          <circle cx="490" cy="95" r="14" fill="#0b0f19" stroke="#fb7185" stroke-width="4"/>
+          <text x="490" y="55" text-anchor="middle" fill="#fb7185" font-size="11" font-weight="700">T3 • URGENT HOTFIX</text>
+          <rect x="415" y="122" width="150" height="96" rx="8" fill="#161f33" stroke="#fb7185"/>
+          <text x="490" y="144" text-anchor="middle" fill="#fb7185" font-size="11.5" font-weight="700">Live Bug / Regression</text>
+          <text x="490" y="163" text-anchor="middle" fill="#94a3b8" font-size="10">reproducer spins up on</text>
+          <text x="490" y="179" text-anchor="middle" fill="#fb7185" font-size="10" font-family="monospace">Port :3090 (worktree)</text>
+          <text x="490" y="195" text-anchor="middle" fill="#94a3b8" font-size="10">Fixes &amp; merges fast!</text>
+
+          <circle cx="685" cy="95" r="14" fill="#0b0f19" stroke="#34d399" stroke-width="4"/>
+          <text x="685" y="55" text-anchor="middle" fill="#34d399" font-size="11" font-weight="700">T4 • NEW FEATURE</text>
+          <rect x="610" y="122" width="150" height="96" rx="8" fill="#161f33" stroke="#34d399"/>
+          <text x="685" y="144" text-anchor="middle" fill="#34d399" font-size="11.5" font-weight="700">Append to BOARD.md</text>
+          <text x="685" y="163" text-anchor="middle" fill="#94a3b8" font-size="10">Run /write-tickets again.</text>
+          <text x="685" y="179" text-anchor="middle" fill="#94a3b8" font-size="10">Continues numbering at</text>
+          <text x="685" y="195" text-anchor="middle" fill="#34d399" font-size="10" font-family="monospace">004, 005... (no overwrite)</text>
+
+          <circle cx="875" cy="95" r="14" fill="#0b0f19" stroke="#fbbf24" stroke-width="4"/>
+          <text x="875" y="55" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700">T5 • FLEET CONTROL</text>
+          <rect x="800" y="122" width="150" height="96" rx="8" fill="#161f33" stroke="#fbbf24"/>
+          <text x="875" y="144" text-anchor="middle" fill="#fbbf24" font-size="11.5" font-weight="700">Mobile Management</text>
+          <text x="875" y="163" text-anchor="middle" fill="#94a3b8" font-size="10">Inspect cost per ticket</text>
+          <text x="875" y="179" text-anchor="middle" fill="#94a3b8" font-size="10">Unblock stuck workers</text>
+          <text x="875" y="195" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="monospace">via Cloudflare Tunnel</text>
+        </svg>
+        <div class="diagram-caption">
+          Figure 2: Evolutionary timeline of a repository managed by worker-fleet v3 across days, sprints, and remote mobile sessions.
+        </div>
+      </div>
+
+      <div class="v-timeline" id="hotfix">
+
+        <div class="v-item">
+          <div class="v-dot"></div>
+          <div class="v-time">Stage 1 • T+00:00 (Foundation Sprint)</div>
+          <div class="v-title">Team Ticket Builds the Core &amp; Unlocks Dependent Solo Tickets</div>
+          <div class="v-desc">
+            You start with Ticket <code>001</code> marked <code>ready</code> (Mode: <code>team</code>) while Tickets <code>002</code> and <code>003</code> are marked <code>ready</code> with <code>waits for 001</code>.
+            <br><br>
+            1. <strong>Router</strong> launches <code>watchdog</code> and starts the Fleet Control server on <code>:3080</code>.<br>
+            2. The teammates negotiate and lock <code>specs/tickets/001-auth-schema/contract.md</code> so their API routes and TypeScript interfaces match.<br>
+            3. Teammates build their assigned surfaces, run <code>tester</code> (via <code>agent-browser</code>), and report to the router.<br>
+            4. <strong>Merger</strong> lands <code>001</code> into <code>main</code> and marks it <code>done</code> on <code>BOARD.md</code>.
+          </div>
+        </div>
+
+        <div class="v-item">
+          <div class="v-dot"></div>
+          <div class="v-time">Stage 2 • T+00:45 (Parallel Solo Sprint)</div>
+          <div class="v-title">Router Auto-Dispatches Independent Tickets Simultaneously</div>
+          <div class="v-desc">
+            Because <code>001</code> is now <code>done</code>, the router scans <code>BOARD.md</code>, sees that <code>002</code> and <code>003</code> now have all dependencies satisfied, and launches them in parallel:
+            <br><br>
+            • Worker A gets <code>002</code> on port <code>:3101</code> (Account <code>t001</code>).<br>
+            • Worker B gets <code>003</code> on port <code>:3102</code> (Account <code>t002</code>).<br>
+            • Both workers write heartbeats to <code>job/status.json</code> visible immediately on the Fleet Control matrix.
+          </div>
+        </div>
+
+        <div class="v-item">
+          <div class="v-dot hotfix"></div>
+          <div class="v-time" style="color: var(--rose);">Stage 3 • Mid-Flight Bug Report &amp; Reproducer Autofix</div>
+          <div class="v-title">Handling Bugs Without Stopping Running Workers</div>
+          <div class="v-desc">
+            If you or <code>checker</code> discover a broken user flow, prompt the router without killing your parallel workers:
+            <div class="code-wrap">
+              <div class="code-bar">
+                <span>Prompt to Running Router</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              </div>
+              <pre><code>The login form throws a 500 when submitting an email with a '+' sign. Investigate and fix.</code></pre>
+            </div>
+            1. Router spawns <code>reproducer</code> in an isolated worktree on port <code>:3090</code>.<br>
+            2. Reproducer verifies the bug twice in <code>agent-browser</code>.<br>
+            3. Since the fix is local (&le;3 files), reproducer commits on a branch and hands off to <code>merger</code>.<br>
+            4. Workers building <code>002</code> and <code>003</code> continue uninterrupted!
+          </div>
+        </div>
+
+        <div class="v-item">
+          <div class="v-dot newfeat"></div>
+          <div class="v-time" style="color: var(--emerald);">Stage 4 • Adding New Feature Requests Over Time</div>
+          <div class="v-title">Incremental Ticket Numbering Without Resetting the Board</div>
+          <div class="v-desc">
+            When you want to add new features days or weeks later, run <code>/write-tickets</code> again. It automatically finds the highest existing ticket number (e.g., <code>003</code>), creates <code>004-...</code> and <code>005-...</code>, preserves all <code>done</code> rows in <code>specs/tickets/BOARD.md</code>, and adds <code>## Do not touch</code> rules so new workers never collide with existing modules.
+          </div>
+        </div>
+
+        <div class="v-item">
+          <div class="v-dot warn"></div>
+          <div class="v-time" style="color: var(--amber);">Stage 5 • Self-Healing &amp; Mobile Unblocking</div>
+          <div class="v-title">How Watchdog &amp; Fleet Control Handle Stalls or Blockers</div>
+          <div class="v-desc" style="margin-bottom: 0;">
+            • <strong>Stalled Worker Recovery:</strong> Every 10 minutes, <code>watchdog</code> executes <code>watchdog-check.sh</code>. If a worker's heartbeat exceeds 15 minutes, watchdog messages <code>@main</code> to inspect or reboot the worker.<br>
+            • <strong>Remote Unblocking via Phone:</strong> If a worker hits a product ambiguity, it updates status to <code>blocked</code>. Fleet Control notifies your phone via Cloudflare Tunnel, where you can type your decision (writing <code>user-decision.md</code>) and unblock the agent immediately.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <footer>
+      <p>Self-Contained HTML Guide • worker-fleet Workflow v3 (<code>write-tickets</code>, <code>setup</code> + 8 Agents &amp; Fleet Control :3080)</p>
+    </footer>
+
+  </main>
+
+  <script>
+    function copyCode(btn) {
+      const pre = btn.closest('.code-wrap').querySelector('pre');
+      const text = pre.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const old = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.style.borderColor = '#34d399';
+        btn.style.color = '#34d399';
+        setTimeout(() => {
+          btn.innerText = old;
+          btn.style.borderColor = '';
+          btn.style.color = '';
+        }, 1600);
+      });
+    }
+  </script>
+</body>
+</html>

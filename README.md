@@ -1,18 +1,18 @@
-# ejad-fleet
+# wv-fleet
 
 Claude plans and reviews; cheaper AIs build. One `/ejadtask` command takes a task from Plane through a short plan,
 a mockup, the build, the review and the delivery (GitLab MR, Plane, Ejad HR) — with a live dashboard, or headless.
 
-It adds an Ejad layer on top of [worker-fleet](#worker-fleet) (the multi-agent build line with the Fleet Control
+It adds an Workerov layer on top of [worker-fleet](#worker-fleet) (the multi-agent build line with the Fleet Control
 dashboard):
 
 | Piece | What it does |
 |---|---|
 | `commands/ejadtask.md` | The `/ejadtask` Claude Code command: sync Plane ↔ Ejad HR, pick and claim a task, write the plan as a fleet ticket (or a handoff prompt in headless mode), mockup, review, deliver, hours. |
-| `overlay/.claude/scripts/ejad-land.cjs` | Token-free delivery: push, GitLab MR (title, description, screenshots, assignee, reviewer), Plane comment + Review, Ejad HR task REVIEW + link + comment. |
-| `overlay/.opencode/plugins/ejad-approvals.js` | Permission policy for OpenCode agents: safe work is allowed, dangerous commands are denied, everything else waits for **Allow / Deny** on the dashboard (and a phone push). |
+| `overlay/.claude/scripts/land.cjs` | Token-free delivery: push, GitLab MR (title, description, screenshots, assignee, reviewer), Plane comment + Review, Ejad HR task REVIEW + link + comment. |
+| `overlay/.opencode/plugins/approvals.js` | Permission policy for OpenCode agents: safe work is allowed, dangerous commands are denied, everything else waits for **Allow / Deny** on the dashboard (and a phone push). |
 | `overlay/.claude/scripts/implementers.json` | The headless command lines of the implementer CLIs: OpenCode (default), Copilot, Kilo, Antigravity. |
-| `patches/` | Small edits to worker-fleet: GitLab landing instead of GitHub, Ejad commit rules and delivery pack, mockup-first tickets, Copilot/Kilo/Antigravity delegation, a **Mockup** tab and the permission panel in the dashboard. |
+| `patches/` | Small edits to worker-fleet: GitLab landing instead of GitHub, Workerov commit rules and delivery pack, mockup-first tickets, Copilot/Kilo/Antigravity delegation, a **Mockup** tab and the permission panel in the dashboard. |
 
 ## Install
 
@@ -21,8 +21,8 @@ Requirements: Git Bash, `git`, `node`, `python3`, [`opencode`](https://opencode.
 (`npm i -g agent-browser`) for the fleet's browser checks.
 
 ```bash
-git clone <this repo> ~/ejad-fleet
-bash ~/ejad-fleet/install.sh /e/Projects/Ejad/dashboard --worker-fleet <worker-fleet folder or git URL>
+git clone <this repo> ~/wv-fleet
+bash <this repo>/install.sh <target-repo>      # worker-fleet comes from vendor/worker-fleet unless you pass --worker-fleet <path-or-git-url>
 ```
 
 Tested with worker-fleet config schema `4.0.0` plus the unreleased dashboard additions (Ring view, ticket done
@@ -30,19 +30,19 @@ time, per-ticket run summary: upstream tickets 091–093). The patches anchor on
 "anchor missing" if a newer worker-fleet changed it.
 
 Windows notes: the patches make the watchdog, wake watcher and dashboard run on Windows (Git Bash, never WSL bash),
-show OpenCode agent sessions in each ticket's Logs tab, and `.claude/scripts/ejad-router-loop.sh` keeps the
-OpenCode router cycling without a terminal (`bash .claude/scripts/ejad-router-loop.sh`).
+show OpenCode agent sessions in each ticket's Logs tab, and `.claude/scripts/router-loop.sh` keeps the
+OpenCode router cycling without a terminal (`bash .claude/scripts/router-loop.sh`).
 
 Planning on the fleet: `/ejadtask` hands planning to the Claude ticket writer `ejad-planner`
-(`overlay/.claude/agents/ejad-planner.md`, Sonnet), started by
-`node .claude/scripts/ejad-plan.cjs <NNN-slug> job/briefs/<NNN>.md`. The ticket shows as `specifying` with the writer
+(`overlay/.claude/agents/wv-planner.md`, Sonnet), started by
+`node .claude/scripts/plan.cjs <NNN-slug> job/briefs/<NNN>.md`. The ticket shows as `specifying` with the writer
 as its agent, and every planner step streams into `job/logs/<NNN>-planner.log`, which is the ticket's Logs tab.
 
 The installer:
 1. installs worker-fleet into the repo, then restores any file the team tracks (the team's files always win);
 2. sets the models (OpenCode Go: router `glm-5.3`, workers `kimi-k2.7-code`, reviewer `deepseek-v4-pro`, the rest
    `glm-5.3-flash`), GitLab landing, 2 workers, app port 4200, $3 per ticket;
-3. adds the Ejad layer and keeps every installed file out of git (`.git/info/exclude`, local only);
+3. adds the Workerov layer and keeps every installed file out of git (`.git/info/exclude`, local only);
 4. copies `/ejadtask` to `~/.claude/commands/` and creates `~/.claude/ejadtask.json` from
    `profile.example.json` if you have none.
 
@@ -75,7 +75,7 @@ Update: `git pull` here and run `install.sh` again. It is idempotent.
    - **Permission** — an agent wants something outside the safe list: **Allow** or **Deny** (no answer in 15 minutes
      = deny);
    - **Question** — a product decision: answer it there.
-5. **Landing is automatic**: tester and reviewer pass → the merger runs `ejad-land.cjs` → MR on GitLab, Plane in
+5. **Landing is automatic**: tester and reviewer pass → the merger runs `land.cjs` → MR on GitLab, Plane in
    Review, Ejad HR in REVIEW, with screenshots and the summary from the worker's delivery pack.
 6. **Optional final review by Claude**: `/ejadtask HR-484 review`. Findings go back to the ticket as rework and the
    fleet fixes them.
@@ -98,7 +98,7 @@ pack in `.delivery/HR-484/`. Then:
 |---|---|
 | `specs/worker-fleet.config.json` | models per role, parallel workers, ports, budgets (re-run `python3 .claude/scripts/apply-setup.py --preset custom` after editing) |
 | `.claude/scripts/implementers.json` | command lines of the implementer CLIs (`{prompt}` is replaced) |
-| `.opencode/plugins/ejad-approvals.js` | the permission policy (`ALLOW_SHELL`, `DENY_SHELL`) |
+| `.opencode/plugins/approvals.js` | the permission policy (`ALLOW_SHELL`, `DENY_SHELL`) |
 | `~/.claude/ejadtask.json` | your ids and reviewers |
 | phone pushes | `python3 .claude/scripts/apply-setup.py --notify-ntfy <your-secret-topic>` and the ntfy app |
 
@@ -109,7 +109,7 @@ here: give them allow rules in their own settings (Kilo's permission config; Ant
 ## Safety
 
 - Nothing installed is committed; the team's tracked files are restored.
-- Agents never push; only `ejad-land.cjs` pushes (never with force) after the tester and reviewer passed.
+- Agents never push; only `land.cjs` pushes (never with force) after the tester and reviewer passed.
 - The approvals plugin denies `git push`, force, deletes outside the worktree, outside network calls and new
   dependencies, and asks you for anything not on the safe list.
 - Mockups run in a sandbox (no network, opaque origin) inside the dashboard.

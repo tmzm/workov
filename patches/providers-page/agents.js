@@ -16,7 +16,7 @@
   async function load() {
     body.textContent = 'Loading…';
     try {
-      var res = await fetch('/api/ejad/providers', { headers: getAuthHeaders() });
+      var res = await fetch('/api/wv/providers', { headers: getAuthHeaders() });
       if (res.status === 401) { openAuthModal(); body.textContent = 'Sign in with the dashboard PIN, then open this tab again.'; return; }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       render(await res.json());
@@ -27,7 +27,7 @@
 
   function act(label, payload, ok, after) {
     var b = el('button', 'btn btn-sm', label); b.type = 'button';
-    b.onclick = async function () { b.disabled = true; var x = await ejadPost(payload); b.disabled = false; toast(x.ok ? ok(x.j) : (x.j.error || 'Failed'), !x.ok); if (x.ok) load(); };
+    b.onclick = async function () { b.disabled = true; var x = await wvPost(payload); b.disabled = false; toast(x.ok ? ok(x.j) : (x.j.error || 'Failed'), !x.ok); if (x.ok) load(); };
     if (after) after(b); return b;
   }
 
@@ -45,9 +45,9 @@
 
     var bar = el('div', 'pvp-row'); bar.style.margin = 'var(--s3) 0';
     bar.append(
-      act('Switch all agents to free models', { action: 'ejad_models_preset', preset: 'free' }, function (j) { return j.roles.length + ' agents now use free models (next agent start)'; }),
-      act('Restore previous models', { action: 'ejad_models_preset', preset: 'restore' }, function (j) { return 'Previous models restored (' + j.roles.length + ' agents)'; }, function (b) { b.disabled = !d.backup; }),
-      act('Refresh model list', { action: 'ejad_refresh_models' }, function (j) { return j.models + ' models available'; }));
+      act('Switch all agents to free models', { action: 'wv_models_preset', preset: 'free' }, function (j) { return j.roles.length + ' agents now use free models (next agent start)'; }),
+      act('Restore previous models', { action: 'wv_models_preset', preset: 'restore' }, function (j) { return 'Previous models restored (' + j.roles.length + ' agents)'; }, function (b) { b.disabled = !d.backup; }),
+      act('Refresh model list', { action: 'wv_refresh_models' }, function (j) { return j.models + ' models available'; }));
     body.append(bar);
 
     var tbl = el('table', 'pvp-agents');
@@ -74,9 +74,9 @@
       tr.insertCell().append(ps); tr.insertCell().append(ms);
       var ac = tr.insertCell(); var row = el('div', 'pvp-row');
       var ap = el('button', 'btn btn-sm btn-primary', 'Apply'); ap.type = 'button';
-      ap.onclick = async function () { if (!ms.value) return; ap.disabled = true; var x = await ejadPost({ action: 'ejad_set_model', role: r.role, model: ms.value }); ap.disabled = false; toast(x.ok ? r.role + ' now uses ' + ms.value + ' (next agent start)' : (x.j.error || 'Could not change the model'), !x.ok); if (x.ok) { cur = ms.value; curProv = ps.value; } };
+      ap.onclick = async function () { if (!ms.value) return; ap.disabled = true; var x = await wvPost({ action: 'wv_set_model', role: r.role, model: ms.value }); ap.disabled = false; toast(x.ok ? r.role + ' now uses ' + ms.value + ' (next agent start)' : (x.j.error || 'Could not change the model'), !x.ok); if (x.ok) { cur = ms.value; curProv = ps.value; } };
       var ts = el('button', 'btn btn-sm', 'Test'); ts.type = 'button';
-      ts.onclick = async function () { if (!ms.value) return; ts.disabled = true; ts.textContent = 'Testing…'; var x = await ejadPost({ action: 'ejad_test_model', model: ms.value }); ts.disabled = false; ts.textContent = 'Test'; toast(x.ok ? (x.j.ok ? ms.value + ' works' : ms.value + ' failed: ' + x.j.detail) : (x.j.error || 'Test failed'), !(x.ok && x.j.ok)); };
+      ts.onclick = async function () { if (!ms.value) return; ts.disabled = true; ts.textContent = 'Testing…'; var x = await wvPost({ action: 'wv_test_model', model: ms.value }); ts.disabled = false; ts.textContent = 'Test'; toast(x.ok ? (x.j.ok ? ms.value + ' works' : ms.value + ' failed: ' + x.j.detail) : (x.j.error || 'Test failed'), !(x.ok && x.j.ok)); };
       row.append(ap, ts); ac.append(row);
     });
     var ir = tb.insertRow();
@@ -85,9 +85,9 @@
     [['none', 'None: the worker builds it itself']].concat(Object.keys(d.clis).map(function (k) { return [k, k + (d.clis[k] ? '' : '  (not installed)')]; })).forEach(function (a) { var o = el('option', '', a[1]); o.value = a[0]; isel.append(o); });
     isel.value = d.implementer; var ic = ir.insertCell(); ic.colSpan = 2; ic.append(isel);
     var ib = el('button', 'btn btn-sm btn-primary', 'Apply'); ib.type = 'button';
-    ib.onclick = async function () { var x = await ejadPost({ action: 'ejad_set_implementer', cli: isel.value }); toast(x.ok ? 'Implementer is now ' + isel.value + ' (next worker)' : (x.j.error || 'Could not change the implementer'), !x.ok); };
+    ib.onclick = async function () { var x = await wvPost({ action: 'wv_set_implementer', cli: isel.value }); toast(x.ok ? 'Implementer is now ' + isel.value + ' (next worker)' : (x.j.error || 'Could not change the implementer'), !x.ok); };
     ir.insertCell().append(ib);
     var wrap = el('div'); wrap.style.overflowX = 'auto'; wrap.append(tbl); body.append(wrap);
   }
-  window.ejadAgentsLoad = load;
+  window.wvAgentsLoad = load;
 })();

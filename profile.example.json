@@ -2,7 +2,7 @@
   "name": "Your first name",
   "planeUserId": "your Plane user uuid (Plane → Profile, or ask Claude to look it up)",
   "gitlabUserId": 0,
-  "ejadHrEmployeeId": "your Ejad HR employee uuid",
+  "ejadHrEmployeeId": "your Workerov HR employee uuid",
   "reviewers": [
     { "name": "reviewer until a date", "gitlabUserId": 0, "until": "2026-12-31" },
     { "name": "default reviewer", "gitlabUserId": 0, "until": null }

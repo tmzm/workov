@@ -47,7 +47,7 @@ Steps:
    the repo could not tell you (AskUserQuestion, with the proposed answers as the options). Then **write the profile file**
    and carry on. `/task <mode> profile` re-opens it for changes.
 2. Make sure the fleet is in the repo: it is when `specs/worker-fleet.config.json` exists. If not, offer to run
-   `bash <ejad-fleet>/install.sh <repo>` (it only adds the fleet; the Ejad layer's Plane/HR parts stay unused for
+   `bash <workerov-fleet>/install.sh <repo>` (it only adds the fleet; the Ejad layer's Plane/HR parts stay unused for
    non-Ejad profiles) and wait for my yes.
 3. Get the task: from the profile's task source (an id), or from my words if the source is `none` or I typed a
    description. Create the ticket on the repo's board exactly as `/ejadtask` does (rd.md with the short plan, tests

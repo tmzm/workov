@@ -30,13 +30,13 @@ Status: proposal, nothing built. Written for the Workeve owner.
   - after the worktree is removed (ticket delivered) the tab falls back to the branch on the remote, or to `results.md` evidence
 
 ## Server pieces (dashboard-server.py patch, read-only git)
-- `GET /api/ejad/projects` (list, counts), `POST` action `ejad_project_save` (create / edit / delete; validates paths)
-- `GET /api/ejad/worktree?ticket=NNN`: `git worktree list`, `rev-list --left-right --count`, `diff --numstat`, `status --porcelain`, `log`
-- `GET /api/ejad/worktree/diff?ticket=NNN&file=...`: one file's unified diff, size limited, path checked to stay inside the worktree
+- `GET /api/wv/projects` (list, counts), `POST` action `wv_project_save` (create / edit / delete; validates paths)
+- `GET /api/wv/worktree?ticket=NNN`: `git worktree list`, `rev-list --left-right --count`, `diff --numstat`, `status --porcelain`, `log`
+- `GET /api/wv/worktree/diff?ticket=NNN&file=...`: one file's unified diff, size limited, path checked to stay inside the worktree
 - every git call uses a fixed argument list (no shell), a timeout, and refuses paths outside the project repo
 
 ## Fleet pieces
-- The router and `ejad-worker-worktree` already create `<repo>-NNN-slug` worktrees; they read the repo and base branch from the ticket's project instead of from one global config.
+- The router and `wv-worker-worktree` already create `<repo>-NNN-slug` worktrees; they read the repo and base branch from the ticket's project instead of from one global config.
 - `/task` and `/ejadtask` ask for the project when a ticket is created (default to the folder you are in).
 - Landing mode, Plane and HR mirroring read their settings from the project (an `ejad` project mirrors, a `task` project does not).
 

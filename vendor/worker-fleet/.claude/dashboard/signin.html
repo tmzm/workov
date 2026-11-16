@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Sign in</title>
+  <style>
+    :root {
+      --bg: #121314;
+      --surface: #1a1b1d;
+      --line: #34363a;
+      --line-strong: #4a4d52;
+      --text: #ecebe7;
+      --text-2: #b4b2ab;
+      --focus: #5aa9ff;
+      --lamp-off: #6b6a66;
+      --lamp-stop: #ff5d52;
+      --lamp-attn: #f5a524;
+      --button-bg: #ecebe7;
+      --button-text: #121314;
+      --button-hover: #ffffff;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #eef0ee;
+        --surface: #ffffff;
+        --line: #d5d7d3;
+        --line-strong: #a9aca6;
+        --text: #17181a;
+        --text-2: #45464a;
+        --focus: #1f66c2;
+        --lamp-off: #8a8984;
+        --lamp-stop: #c8322a;
+        --lamp-attn: #a35f00;
+        --button-bg: #17181a;
+        --button-text: #ffffff;
+        --button-hover: #000000;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+               max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    main {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 32px 24px 24px;
+    }
+    .title { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .lamp {
+      width: 12px; height: 12px; border-radius: 50%; flex: none;
+      border: 2px solid var(--lamp-off); background: transparent;
+    }
+    body[data-signin-state="invalid"] .lamp { background: var(--lamp-stop); border-color: var(--lamp-stop); box-shadow: 0 0 10px var(--lamp-stop); }
+    body[data-signin-state="locked"] .lamp { background: var(--lamp-attn); border-color: var(--lamp-attn); box-shadow: 0 0 10px var(--lamp-attn); }
+    h1 { font-size: 1.4375rem; line-height: 1.2; font-weight: 650; letter-spacing: -0.01em; }
+    #signin-help { color: var(--text-2); font-size: 0.9375rem; margin-bottom: 24px; }
+    label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 6px; }
+    input {
+      display: block; width: 100%; min-height: 48px;
+      padding: 10px 12px;
+      font: 16px/1.4 ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+      color: var(--text); background: var(--bg);
+      border: 1px solid var(--line-strong); border-radius: 6px;
+    }
+    input:focus-visible, button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    #signin-error { min-height: 1.5em; margin: 8px 0 16px; font-size: 0.9375rem; font-weight: 600; }
+    body[data-signin-state="invalid"] #signin-error { color: var(--lamp-stop); }
+    body[data-signin-state="locked"] #signin-error { color: var(--lamp-attn); }
+    button {
+      display: block; width: 100%; min-height: 48px;
+      font: inherit; font-weight: 650;
+      color: var(--button-text); background: var(--button-bg);
+      border: 0; border-radius: 6px; cursor: pointer;
+    }
+    button:hover { background: var(--button-hover); }
+    .signin-hint { margin-top: 20px; font-size: 0.875rem; color: var(--text-2); }
+    code { font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace; font-size: 0.875em; }
+  </style>
+</head>
+<body data-signin-state="signed-out">
+  <main>
+    <div class="title"><span class="lamp" aria-hidden="true"></span><h1>Sign in</h1></div>
+    <p id="signin-help">This dashboard is private. Enter its access token to continue.</p>
+    <form id="signin-form" method="get" action="/">
+      <label for="signin-token">Access token</label>
+      <input id="signin-token" name="token" type="password" autocomplete="current-password" required spellcheck="false" autocapitalize="off" autocorrect="off" />
+      <p id="signin-error" role="alert"></p>
+      <button id="signin-submit" type="submit">Sign in</button>
+    </form>
+    <p class="signin-hint">The token is the part after <code>token=</code> in the link the dashboard printed when it started.</p>
+  </main>
+</body>
+</html>
