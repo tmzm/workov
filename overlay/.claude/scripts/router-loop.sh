@@ -30,6 +30,14 @@ answered() {
 active() { working || answered; }
 # One worker at a time across every project on this machine: when another registered fleet (~/.workerov/fleets.json)
 # has a live worker, this cycle may reconcile and answer decisions but must not start a worker.
+# A project that is only waiting for another project's worker (nothing of its own building, no answered decision to hand
+# over) needs no model call: sleeping costs nothing, a cycle that only says "dispatch paused" costs tokens every interval.
+waiting_only() {
+  [ -n "$(python3 -I "$HOME/.wv-bin/wv-busy.py" "$PWD" 2>/dev/null | tr -d '')" ] || return 1
+  grep -qE '^\| [0-9]{3} .*\| in-progress *\|' specs/tickets/BOARD.md && return 1
+  answered && return 1
+  return 0
+}
 busy_note() {
   local b
   b="$(python3 -I "$HOME/.wv-bin/wv-busy.py" "$PWD" 2>/dev/null | tr -d '\r')"
@@ -54,6 +62,11 @@ SID="${WV_ROUTER_SESSION:-}"
 FIRST="Run the fleet. Reconcile job/router-state.json first: a worker listed there may still be alive inside OpenCode (check its job/status.json heartbeat and its session) before you re-dispatch it. Dispatch every ready ticket, verify finished ones against eval.md, and land them per their Landing mode. Do one full cycle, then end your turn; you will be called again."
 NEXT="Next router cycle: reconcile, read worker heartbeats and results, dispatch ready tickets, verify and land finished ones, answer or record pending decisions. Then end your turn."
 while active; do
+  if waiting_only; then
+    echo "[router-loop] waiting for another project's worker: no router cycle until it is done"
+    sleep "$INTERVAL"
+    continue
+  fi
   if [ -z "$SID" ]; then
     opencode run --auto --agent router "$FIRST$(busy_note)"
     SID="$(latest_router_session | tr -d '\r')"
