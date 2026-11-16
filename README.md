@@ -4,7 +4,7 @@ A desktop app and a fleet of AI agents that plans, builds, reviews and delivers 
 Claude plans and reviews; cheaper models build. You watch one board, answer a few questions, and every ticket ends as a
 merge request.
 
-- **One app, one dashboard, one board** for every project on the computer.
+- **One app, one dashboard, one board, one router** for every project on the computer.
 - **One worker at a time** across all projects, and **one router turn at a time**, so a normal laptop is enough.
 - **Your repositories are never touched.** Each project's fleet lives in its own managed folder; work reaches your repo
   the normal way, as a pushed branch and a draft merge request.
@@ -28,7 +28,7 @@ downloading. Without the app, `bash install.sh <repository>` does the same from 
 | **Workerov app** (`app/`) | The window, tray, chat, notifications, the **Background processes** window and **Add project…**. It remembers where its window was. |
 | **Dashboard** (port 3080) | The only dashboard. The Board shows the tickets of every project with a project filter; **All projects** adds Dispatch/Pause per ticket and shows whose router turn it is. Tickets of any project open in the same drawer with the same buttons. |
 | **Fleet home** (`~/Workerov/fleets/<project>`) | A clone of the project's repository with the fleet installed in it: agents, scripts, `specs/tickets`, `job/`. The dashboard serves every project from its own fleet home, one request at a time, in that project's folder. |
-| **Router** | One router loop per project, but `wv-turn.py` lets only one project make a router model call at a time (a project with a live worker or an answered question is always watched; ready tickets start in fair turns, and only when no worker runs anywhere). Idle or waiting projects cost nothing. |
+| **Router** | One router session for every project. `router-loop.sh` runs from the hub only; each cycle `wv-turn.py --pick` chooses the project (a project with a live worker, a ticket in progress or an answered question is always served; ready tickets start in fair turns, and only when no worker runs anywhere) and the cycle message names it. The permission plugin (`.opencode/wv/router-scope.mjs`) lets the router change files only under that project's folder. Idle or switched-off projects cost nothing. |
 | **Machine limits** | `heavy-run` shims put install/test/lint/build in one machine-wide queue, even when an agent runs them in PowerShell or Git Bash. |
 | **Registry** | `~/.workerov/fleets.json` lists the projects (written by `install.sh`). |
 
