@@ -47,8 +47,8 @@ sub(/const drafts = tickets\.filter\(\s*\(?t\)? =>\s*String\(t\.status \|\| ''\)
   `const drafts = window.wvDraftCount
           ? window.wvDraftCount(tickets)
           : tickets.filter((t) => String(t.status || '').toLowerCase() === 'draft').length;`, 'drafts count');
-sub(/onclick: \(\) => jumpToStage\('plan'\),(\s*\},\s*'Review')/,
-  (m) => `onclick: () => (window.wvReviewDrafts ? window.wvReviewDrafts() : jumpToStage('plan')),` + m[1], 'drafts Review button');
+sub(/onclick: \(\) => jumpToStage\('plan'\)(,?\s*\},\s*'Review')/,
+  (m) => `onclick: () => (window.wvReviewDrafts ? window.wvReviewDrafts() : jumpToStage('plan'))` + m[1], 'drafts Review button');
 
 // 5. the drawer reads other projects' tickets and shows their actions
 sub(/return \(\(stateData && stateData\.tickets\) \|\| \[\]\)\.find\(\(?t\)? => t\.id === id\);(\s*\}\s*function answerFor)/,
