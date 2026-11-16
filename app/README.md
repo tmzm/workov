@@ -53,3 +53,11 @@ A tray app that starts with Windows, keeps the fleet dashboard, router loop and 
   plain text (Text). Per agent: formatted messages, folded thinking, one row per tool (command with output, diffs for edits,
   reads, searches), the plan as a checklist. Patches: `agent-steps.cjs` (server, `/api/wv/steps`) and
   `dashboard-steps.cjs` (page; it inlines `app/chat-md.js`).
+
+## Background processes
+
+Tray menu → **Background processes…**, or the **Background processes…** button in the dashboard's System panel. The
+window lists what the fleet runs on this computer, grouped as Dashboard, Router, Agents, Tests and builds, Chat and
+Network, each with its memory (a test run includes its browser and bundler). **Stop…** asks first and explains what
+could break; it then ends that process and the ones it started. Nothing else is stopped: Workerov itself is never
+listed, and a stop re-reads the live list so a reused process id can never be hit by mistake. Windows only.

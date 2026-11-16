@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" data-theme="tmzm" data-mode="dark">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Background processes</title>
+<script src="chat-boot.js"></script>
+<link rel="stylesheet" href="chat.css">
+<style>
+body{display:block;overflow:auto}
+.wrap{max-width:860px;margin:0 auto;padding:24px 20px 40px}
+h1{margin:0 0 4px;font-size:1.3em}
+.sub{color:var(--faint);font-size:13px;margin-bottom:16px;line-height:1.5}
+.bar{display:flex;gap:16px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13px;color:var(--dim)}
+.bar b{color:var(--text)}
+h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:20px 0 6px}
+.row{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:6px}
+.name{color:var(--text);font-size:14px}
+.meta{color:var(--faint);font-size:12px;margin-top:2px}
+.mem{color:var(--dim);font-size:13px;font-variant-numeric:tabular-nums;min-width:70px;text-align:right}
+.mem.high{color:var(--accent);font-weight:600}
+button.stop{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+button.stop:hover,button.stop:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+button.stop:disabled{opacity:.5;cursor:default}
+.empty,.err{color:var(--faint);padding:24px 0;text-align:center;font-size:14px}
+.err{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Background processes</h1>
+  <div class="sub">Everything the fleet is running in the background on this computer. Stopping one asks you first, because it can break work that is in progress. Workerov itself is never listed.</div>
+  <div class="bar"><span>Listed: <b id="total">—</b> in <b id="count">—</b></span><span id="free"></span><button class="stop" id="refresh" type="button">Refresh</button></div>
+  <div id="list" aria-live="polite"><div class="empty">Loading…</div></div>
+</div>
+<script src="processes-page.js"></script>
+</body>
+</html>

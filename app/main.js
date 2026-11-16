@@ -158,6 +158,7 @@ function menu() {
     { label: 'Start with Windows', type: 'checkbox', checked: !!cfg.autostart, click: (i) => { cfg.autostart = i.checked; saveCfg(); applyLoginItem(); } },
     { label: 'Choose fleet folder…', click: chooseFleet },
     { label: 'Chat from the phone link', type: 'checkbox', checked: cfg.remoteChat !== false, click: (i) => { cfg.remoteChat = i.checked; saveCfg(); } },
+    { label: 'Background processes…', click: openProcesses },
     { label: 'Setup & checks…', click: openSetup },
     { label: 'About ' + APP_NAME, click: openAbout },
     { type: 'separator' },
@@ -269,6 +270,7 @@ function setupChat() {
     if (!fromDashboard(e) || !chatView || !chatViewShown || chatView.webContents.isDestroyed()) return null;
     try { return 'data:image/jpeg;base64,' + (await chatView.webContents.capturePage()).toJPEG(85).toString('base64'); } catch { return null; }
   });
+  ipcMain.handle('shell:openProcesses', (e) => { if (fromDashboard(e)) openProcesses(); });
   ipcMain.handle('shell:chatHide', (e) => { if (fromDashboard(e)) hideChatView(); });
 }
 
@@ -299,6 +301,30 @@ function openAbout() {
   lockChat(aboutWin.webContents);
   aboutWin.on('closed', () => { aboutWin = null; });
   aboutWin.loadFile(path.join(__dirname, 'about.html'), { query: { name: APP_NAME } });
+}
+
+// ---------- background processes: see what runs and stop it, after a warning ----------
+const procs = require('./processes');
+let procWin = null;
+const fromProc = (e) => !!procWin && e.sender === procWin.webContents;
+ipcMain.handle('proc:list', async (e) => (fromProc(e) ? procs.list() : []));
+ipcMain.handle('proc:stop', async (e, pid, start) => {
+  if (!fromProc(e) || !Number.isInteger(pid) || typeof start !== 'string') return { ok: false, error: 'Not allowed.' };
+  const row = (await procs.list()).find((r) => r.pid === pid && r.start === start);
+  if (!row) return { ok: false, error: 'That process has already ended or changed.' };
+  const r = await dialog.showMessageBox(procWin, { type: 'warning', buttons: ['Cancel', 'Stop it'], defaultId: 0, cancelId: 0, noLink: true,
+    title: 'Stop this background process?', message: 'Stop "' + row.label + '"?',
+    detail: [row.risk, 'Stopping it can break something that is running right now, and it cannot be undone. Only continue if it is stuck or you started it by mistake.'].join(String.fromCharCode(10, 10)) });
+  if (r.response !== 1) return { cancelled: true };
+  return procs.stop(pid, start);
+});
+function openProcesses() {
+  if (procWin) { procWin.show(); procWin.focus(); return; }
+  procWin = new BrowserWindow({ width: 780, height: 640, minWidth: 560, minHeight: 420, backgroundColor: '#0f0e0b', title: 'Background processes', autoHideMenuBar: true, icon: path.join(__dirname, 'icon.png'),
+    webPreferences: { preload: path.join(__dirname, 'processes-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  lockChat(procWin.webContents);
+  procWin.on('closed', () => { procWin = null; });
+  procWin.loadFile(path.join(__dirname, 'processes.html'), { query: { name: APP_NAME } });
 }
 
 // ---------- the window ----------

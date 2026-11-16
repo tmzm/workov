@@ -8,6 +8,7 @@ if (/\/start\.html/.test(location.pathname)) contextBridge.exposeInMainWorld('fl
 contextBridge.exposeInMainWorld('fleetShell', {
   chatShow: (rect) => ipcRenderer.invoke('shell:chatShow', rect),
   chatHide: () => ipcRenderer.invoke('shell:chatHide'),
+  openProcesses: () => ipcRenderer.invoke('shell:openProcesses'),
   chatSnapshot: () => ipcRenderer.invoke('shell:chatSnapshot'),
   chatTheme: (s) => ipcRenderer.invoke('shell:chatTheme', s),
 });
