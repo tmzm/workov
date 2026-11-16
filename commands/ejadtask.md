@@ -91,7 +91,7 @@ From the repository you are running in:
 - **GitLab:** uploads with curl multipart to `/api/v4/projects/<encoded path>/uploads`, token from
   `glab config get token --host <host>` (never print it). MRs with array fields through REST with a JSON body (node
   fetch).
-- **Ejad HR** (production): API `https://hr.ejad.net/api/v1`, Swagger `https://hr.ejad.net/api/docs-json` (read it
+- **Ejad HR** (production, the live source of truth for tasks: first priority, and the only system synced when it and Plane differ): API `https://hr.ejad.net/api/v1`, Swagger `https://hr.ejad.net/api/docs-json` (read it
   before a new endpoint). Credentials ONLY from the Windows user env vars `HR_EMAIL` / `HR_PASS`; never print, never
   write to a file or URL; missing → ask me. Time zone from a session (`companyTimeZone`). A mirror task has the line
   `Imported from Plane <IDENT>-<n>`. Statuses PLANNED, IN_PROGRESS, REVIEW, DONE (needs `acceptanceConfirmed: true`),
@@ -219,16 +219,30 @@ lines or fewer, the blockers: questions an implementer would have to ask about a
 claims, missing states or texts, contradictions. Not lint-level details. You fix the blockers yourself in the main
 session, or with a fresh Planner given a short list. No second round unless a fix changed a decision.
 
+## Ticket flow (fixed; the fleet asks me at each step)
+
+1. **Before skipping anything.** A required screenshot or check that cannot run (no test account, no credential, no
+   tool) is never skipped on the agent's own decision. The ticket stops as `blocked` with the exact need and two
+   options (skip it with a note, or I provide it and the ticket retries), and I answer on the dashboard. Only my
+   answer, written to `user-decision.md`, allows a SKIP.
+2. **Draft MR ready** (ticket `in-review`): I choose the review: the fleet reviewer, Claude, both, or skip.
+3. **After the review:** I choose whether to deliver. Yes: the MR becomes ready, then Ejad HR first and Plane after
+   are moved to Review (and the hours follow). No: the ticket ends as done, the MR stays a draft and Ejad HR and Plane
+   are not touched.
+
 ## Part A — prepare (default)
 
-1. **Sync (scoped).** By default sync only the chosen task's Plane item ↔ Ejad HR mirror (status, assignee, link).
-   With `sync` in the input: the Scout compares the whole project (status Backlog/Todo → PLANNED, In Progress →
-   IN_PROGRESS, Review → REVIEW, Done → DONE, Cancelled → ask me; assignee by email; missing mirrors created). Small
-   fixes to my own tasks: apply. Bulk changes or other people's tasks: ask first.
-2. **Pick the task** unless the input names one: open (Backlog/Todo) items of the kind this repo builds (by label),
-   mine first, then unassigned; skip others' items; every "Depends on" Done; not already built (search the code).
-   None qualifies → ask me.
-3. **Claim it.** Plane: assign me, move to In Progress. Ejad HR: mirror to IN_PROGRESS, assigned to me.
+1. **Sync (Ejad HR first).** Ejad HR (live) is the source of truth for tasks: read it first and trust it over Plane.
+   By default sync only the chosen task: Ejad HR is read, and its Plane mirror (if one exists) is brought into line
+   with it (status, assignee, link). The direction is always Ejad HR to Plane, never the reverse. A gap between the two
+   is settled in Ejad HR's favour; do not create or change Ejad HR tasks because of Plane. With `sync` in the input:
+   the Scout lists my Ejad HR tasks and fixes only the Plane mirrors that differ from them (PLANNED to Backlog/Todo,
+   IN_PROGRESS to In Progress, REVIEW to Review, DONE to Done; a Plane item with no Ejad HR task is reported to me, not
+   copied into Ejad HR). Small fixes to my own mirrors: apply. Bulk changes or other people's tasks: ask first.
+2. **Pick the task** unless the input names one: from **Ejad HR** (live), my PLANNED tasks of the kind this repo
+   builds, then unassigned ones; skip others' tasks; every dependency Done; not already built (search the code). A
+   Plane-only item is not a task until it exists in Ejad HR. None qualifies: ask me.
+3. **Claim it.** Ejad HR first: IN_PROGRESS, assigned to me. Then the Plane mirror, if there is one, follows.
 4. **Branch.** `feat/<name>` from the latest default branch (without disturbing the checkout; see Fixed facts). If a
    branch and plan already exist, update that plan instead.
 5. **Plan.** The Planner writes it to the Plan standard (give it the standard's text, the task, the repo rules, the

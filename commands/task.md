@@ -23,8 +23,22 @@ The first word of my input names the mode. When it does not, decide from the cur
 ## 2. Ejad mode
 
 Read `~/.claude/commands/ejadtask.md` in full and follow it exactly, passing the rest of my input as its input. Nothing
-about Ejad work changes: Plane sync, Ejad HR, GitLab MR, reviewers, hours, and every rule in that file stay as they are.
+about Ejad work changes: Ejad HR first (then the Plane mirror), GitLab MR, reviewers, hours, and every rule in that file stay as they are.
 `/ejadtask` keeps working as the same thing.
+
+## Ticket flow (every mode)
+
+The fleet asks me at three points, whatever the mode:
+
+1. **Before skipping anything.** A required screenshot or check that cannot run (no test account, credential or tool) is
+   never skipped by the agent. The ticket blocks with the exact need and two options (skip it with a note, or I provide
+   it and it retries); only my answer allows a skip.
+2. **Draft MR ready:** I choose the review: the fleet reviewer, Claude, both, or skip.
+3. **After the review:** I choose whether to deliver. Yes: the MR becomes ready and the trackers are updated. No: the
+   ticket ends as done and nothing else is touched.
+
+In `ejad` mode the trackers are **Ejad HR first**: Ejad HR (live) is the source of truth, tasks come from it, and when
+it and Plane differ only the Plane mirror is brought into line with it, never the reverse (see `/ejadtask`).
 
 ## 3. Every other mode: the profile
 
