@@ -61,7 +61,9 @@ are replaced whole. `dashboard.port` and secrets are never layered.
 - Read: `python wv-bin/wv-settings.py resolve --hub HUB --project NAME --base PROJECT --ticket 012 [--key models.worker.runtime]`
   prints the effective settings and which layer set each key. Node scripts use `.claude/scripts/wv-settings.cjs`.
 - Write: `... set --scope project|ticket ... --values '{"models":{"worker":{"runtime":"claude"}}}' --enabled true`, or the
-  "Settings layers" section on the dashboard's Agents tab. A change applies from the next agent start, never mid-run.
+  "Settings layers" section on the dashboard's Agents tab: every agent (router, worker, teammate, reviewer, reproducer, tester, merger,
+  checker, watchdog, planner, designer) in the Global, Project and Ticket scope, with the layer each value comes from. The router, watchdog and
+  designer run once for the whole fleet, so they can only be set globally. A change applies from the next agent start, never mid-run.
 - Old headers: `python wv-bin/wv-migrate-settings.py` (dry run; `--apply` writes) moves a project config that differs from the hub into
   a disabled project layer and a not-done ticket's `**Worker harness:**` / `**Worker model:**` header into its ticket layer. After that
   a header in `rd.md` overrides nothing.
