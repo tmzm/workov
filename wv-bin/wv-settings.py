@@ -16,6 +16,7 @@ import copy
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -114,6 +115,60 @@ def load(hub, project=None, base=None, ticket=None):
     return resolve(g, p, t)
 
 
+# ---- writing the layers ----------------------------------------------------------------------------------------------------
+
+def _write_json(path, data):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, path)
+
+
+def _patch(layer, values, enabled):
+    """`values` merged into `layer`; a None value removes that key; `enabled` (when given) sets the flag. A new layer starts disabled."""
+    out = merge(layer if isinstance(layer, dict) else {"enabled": False}, {})
+    def apply(dst, src):
+        for k, v in src.items():
+            if v is None:
+                dst.pop(k, None)
+            elif isinstance(v, dict) and isinstance(dst.get(k), dict):
+                apply(dst[k], v)
+            else:
+                dst[k] = copy.deepcopy(v)
+    apply(out, values or {})
+    if enabled is not None:
+        out["enabled"] = bool(enabled)
+    return out
+
+
+def set_project_layer(hub, name, root, values=None, enabled=None):
+    """Edit a project's layer in the hub's specs/projects.json (`fleet.settings`), creating the project row and the layer when missing."""
+    path = Path(hub) / "specs" / "projects.json"
+    data = read_json(path)
+    rows = data.get("projects") if isinstance(data.get("projects"), list) else []
+    row = next((r for r in rows if isinstance(r, dict) and (r.get("name") == name or (root and r.get("root") and _norm(r["root"]) == _norm(root)))), None)
+    if row is None:
+        row = {"name": name, "root": str(root or "")}
+        rows.append(row)
+    fleet = row.setdefault("fleet", {})
+    fleet["settings"] = _patch(fleet.get("settings"), values, enabled)
+    data["projects"] = rows
+    _write_json(path, data)
+    return fleet["settings"]
+
+
+def set_ticket_layer(base, ticket, values=None, enabled=None):
+    """Edit a ticket's layer: `settings` in <project>/job/stage/<NNN>.json, keeping every other key of that file."""
+    path = Path(base) / "job" / "stage" / (str(ticket).split("-")[0] + ".json")
+    data = read_json(path)
+    data["settings"] = _patch(data.get("settings"), values, enabled)
+    _write_json(path, data)
+    return data["settings"]
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -123,7 +178,21 @@ def main(argv=None):
     r.add_argument("--base")
     r.add_argument("--ticket")
     r.add_argument("--key", help="print one effective value (dotted path) instead of everything")
+    w = sub.add_parser("set", help="edit a project or ticket layer")
+    w.add_argument("--scope", choices=("project", "ticket"), required=True)
+    w.add_argument("--hub", required=True)
+    w.add_argument("--project", help="project name (scope project)")
+    w.add_argument("--base", help="project folder")
+    w.add_argument("--ticket")
+    w.add_argument("--values", default="{}", help='JSON of the keys to set; a null value removes the key')
+    w.add_argument("--enabled", choices=("true", "false"))
     a = ap.parse_args(argv)
+    if a.cmd == "set":
+        vals = json.loads(a.values)
+        en = None if a.enabled is None else a.enabled == "true"
+        layer = set_project_layer(a.hub, a.project, a.base, vals, en) if a.scope == "project" else set_ticket_layer(a.base, a.ticket, vals, en)
+        print(json.dumps(layer, indent=2, ensure_ascii=False))
+        return 0
     res = load(a.hub, a.project, a.base, a.ticket)
     if a.key:
         v = get(res, a.key)

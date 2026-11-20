@@ -122,6 +122,50 @@ class Load(unittest.TestCase):
         self.assertEqual((code, out.getvalue().strip()), (0, "opus"))
 
 
+class WriteLayers(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.hub, self.base = Path(self.tmp.name) / "hub", Path(self.tmp.name) / "proj"
+        (self.hub / "specs").mkdir(parents=True)
+        (self.hub / "specs" / "worker-fleet.config.json").write_text(json.dumps(GLOBAL), encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_new_project_layer_starts_disabled_then_switches_on(self):
+        layer = W.set_project_layer(self.hub, "app", self.base, {"models": {"worker": {"runtime": "claude"}}})
+        self.assertFalse(layer["enabled"])
+        self.assertEqual(W.load(self.hub, "app", self.base)["sources"].get("models.worker.runtime"), "kit")  # disabled: no effect
+        W.set_project_layer(self.hub, "app", self.base, enabled=True)
+        res = W.load(self.hub, "app", self.base)
+        self.assertEqual((W.get(res, "models.worker.runtime"), res["sources"]["models.worker.runtime"]), ("claude", "project"))
+
+    def test_none_removes_a_key_and_other_projects_are_kept(self):
+        W.set_project_layer(self.hub, "a", self.base, {"models": {"worker": {"runtime": "claude", "claude": {"model": "opus"}}}}, True)
+        W.set_project_layer(self.hub, "b", self.base / "x", {"harness": "claude"}, True)
+        layer = W.set_project_layer(self.hub, "a", self.base, {"models": {"worker": {"runtime": None}}})
+        self.assertEqual(layer["models"]["worker"], {"claude": {"model": "opus"}})
+        rows = json.loads((self.hub / "specs" / "projects.json").read_text(encoding="utf-8"))["projects"]
+        self.assertEqual([r["name"] for r in rows], ["a", "b"])
+
+    def test_ticket_layer_keeps_the_rest_of_the_stage_file(self):
+        f = self.base / "job" / "stage" / "012.json"
+        f.parent.mkdir(parents=True)
+        f.write_text(json.dumps({"design": {"state": "review"}}), encoding="utf-8")
+        W.set_ticket_layer(self.base, "012-build", {"models": {"worker": {"opencode": {"model": "x/y"}}}}, True)
+        data = json.loads(f.read_text(encoding="utf-8"))
+        self.assertEqual(data["design"], {"state": "review"})
+        self.assertEqual(W.get(W.load(self.hub, None, self.base, "012"), "models.worker.opencode.model"), "x/y")
+
+    def test_cli_set(self):
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(W.main(["set", "--scope", "project", "--hub", str(self.hub), "--project", "p", "--base", str(self.base),
+                                     "--values", '{"harness": "claude"}', "--enabled", "true"]), 0)
+        self.assertEqual(W.get(W.load(self.hub, "p", self.base), "harness"), "claude")
+
+
 class NodeHelper(unittest.TestCase):
     """overlay/.claude/scripts/wv-settings.cjs: the same answers for node callers, in a scratch home folder."""
     HELPER = Path(__file__).resolve().parent.parent / "overlay" / ".claude" / "scripts" / "wv-settings.cjs"
