@@ -166,6 +166,42 @@ class WriteLayers(unittest.TestCase):
         self.assertEqual(W.get(W.load(self.hub, "p", self.base), "harness"), "claude")
 
 
+class CleanModels(unittest.TestCase):
+    def test_valid_edit_blank_becomes_none(self):
+        out = W.clean_models({"worker": {"runtime": "claude", "opencode": {"model": " nvidia/big "}, "claude": {"model": "", "effort": "high"}},
+                              "tester": {"opencode": {"model": "a/b"}}}, "project")
+        self.assertEqual(out["worker"], {"runtime": "claude", "opencode": {"model": "nvidia/big"}, "claude": {"model": None, "effort": "high"}})
+        self.assertEqual(out["tester"], {"opencode": {"model": "a/b"}})
+
+    def test_global_only_roles_are_refused_below_global(self):
+        for role in W.GLOBAL_ONLY_ROLES:
+            with self.assertRaises(ValueError):
+                W.clean_models({role: {"opencode": {"model": "a/b"}}}, "ticket")
+            self.assertIn(role, W.clean_models({role: {"opencode": {"model": "a/b"}}}, "global"))
+
+    def test_bad_input_is_refused(self):
+        bad = [{"worker": {"opencode": {"model": "bad model;rm"}}}, {"worker": {"claude": {"effort": "turbo"}}},
+               {"worker": {"claude": {"model": "provider/model"}}}, {"tester": {"runtime": "claude"}}, {"worker": {"runtime": "gpt"}},
+               {"Bad Role": {}}, {"worker": {"unknown": 1}}, {"worker": {"opencode": {"key": "secret"}}}, ["x"]]
+        for b in bad:
+            with self.assertRaises(ValueError, msg=str(b)):
+                W.clean_models(b, "project")
+
+
+class SetGlobal(unittest.TestCase):
+    def test_edits_one_role_keeps_the_rest_and_backs_up(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "specs" / "worker-fleet.config.json"
+            f.parent.mkdir(parents=True)
+            f.write_text(json.dumps(GLOBAL), encoding="utf-8")
+            W.set_global(d, {"reviewer": {"opencode": {"model": "new/rev"}}, "worker": {"opencode": {"fallbacks": None}}})
+            cfg = json.loads(f.read_text(encoding="utf-8"))
+            self.assertEqual(cfg["models"]["reviewer"]["opencode"]["model"], "new/rev")
+            self.assertEqual(cfg["models"]["worker"]["opencode"], {"model": "nvidia/ultra"})
+            self.assertEqual(cfg["dashboard"], {"port": 3080})
+            self.assertEqual(json.loads(Path(str(f) + ".bak-settings").read_text(encoding="utf-8"))["models"]["reviewer"]["opencode"]["model"], "nvidia/ultra")
+
+
 class NodeHelper(unittest.TestCase):
     """overlay/.claude/scripts/wv-settings.cjs: the same answers for node callers, in a scratch home folder."""
     HELPER = Path(__file__).resolve().parent.parent / "overlay" / ".claude" / "scripts" / "wv-settings.cjs"

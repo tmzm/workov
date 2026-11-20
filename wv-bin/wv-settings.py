@@ -15,6 +15,8 @@ import argparse
 import copy
 import json
 import os
+import re
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -23,6 +25,12 @@ HERE = Path(__file__).resolve().parent
 KIT_FILE = HERE / "wv-settings-defaults.json"
 LAYERABLE = ("harness", "models", "approvals", "budget", "concurrency", "landing", "stack")
 LAYERS = ("kit", "global", "project", "ticket")
+# roles that run once for the whole hub, or inside the router's own session: a project or a ticket cannot change them at launch
+GLOBAL_ONLY_ROLES = ("router", "watchdog", "designer")
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+_ROLE_RE = re.compile(r"^[a-z][a-z0-9-]{0,30}$")
+_OC_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/:-]{0,120}$")
+_CL_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 def read_json(path):
@@ -142,6 +150,55 @@ def _patch(layer, values, enabled):
     if enabled is not None:
         out["enabled"] = bool(enabled)
     return out
+
+
+def clean_models(models, scope):
+    """Validate a `models` edit for a scope (global, project or ticket); returns the cleaned dict, '' becoming None (= remove the key).
+    Raises ValueError with a sentence fit for the UI. Per role: `runtime` (worker only), `opencode.model`, `claude.model`, `claude.effort`."""
+    if not isinstance(models, dict):
+        raise ValueError("The models must be an object.")
+    out = {}
+    for role, spec in models.items():
+        if not isinstance(role, str) or not _ROLE_RE.match(role) or not isinstance(spec, dict):
+            raise ValueError("That is not a role of the fleet.")
+        if scope != "global" and role in GLOBAL_ONLY_ROLES:
+            raise ValueError("The " + role + " runs once for the whole fleet: set it globally.")
+        r = {}
+        for k, v in spec.items():
+            if k == "runtime":
+                if role != "worker" or v not in ("", "claude", "opencode"):
+                    raise ValueError("Only the worker has a runtime, and it is claude or opencode.")
+                r[k] = v or None
+            elif k in ("opencode", "claude") and isinstance(v, dict):
+                sub = {}
+                for kk, vv in v.items():
+                    vv = (vv or "").strip() if isinstance(vv, str) or vv is None else vv
+                    if kk == "model":
+                        if vv and not (_OC_MODEL_RE if k == "opencode" else _CL_MODEL_RE).match(str(vv)):
+                            raise ValueError("That model name has characters a model name does not have.")
+                        sub[kk] = vv or None
+                    elif kk == "effort" and k == "claude":
+                        if vv and vv not in EFFORTS:
+                            raise ValueError("The effort is one of " + ", ".join(EFFORTS) + ".")
+                        sub[kk] = vv or None
+                    else:
+                        raise ValueError("Unknown setting.")
+                r[k] = sub
+            else:
+                raise ValueError("Unknown setting.")
+        out[role] = r
+    return out
+
+
+def set_global(hub, models):
+    """Edit models.<role> in the hub's worker-fleet.config.json (the global layer), keeping one rolling backup next to it."""
+    path = Path(hub) / "specs" / "worker-fleet.config.json"
+    cfg = read_json(path)
+    if path.exists():
+        shutil.copy2(path, str(path) + ".bak-settings")
+    cfg = _patch(cfg, {"models": models}, None)
+    _write_json(path, cfg)
+    return cfg.get("models", {})
 
 
 def set_project_layer(hub, name, root, values=None, enabled=None):
