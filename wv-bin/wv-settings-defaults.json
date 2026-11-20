@@ -1,0 +1,7 @@
+{
+  "harness": "opencode",
+  "approvals": { "mode": "auto" },
+  "models": {
+    "worker": { "runtime": "opencode", "claude": { "model": "sonnet" } }
+  }
+}

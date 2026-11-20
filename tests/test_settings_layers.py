@@ -103,8 +103,9 @@ class Load(unittest.TestCase):
 
     def test_ticket_slug_and_unknown_project_and_missing_files(self):
         self.assertEqual(W.get(W.load(self.hub, "admin-panel", self.base, "012-build-session"), "models.worker.claude.model"), "opus")
-        self.assertIsNone(W.get(W.load(self.hub, "nope", self.base, "999"), "models.worker.runtime"))
-        self.assertEqual(W.get(W.load(self.root / "missing"), "models"), None)
+        unknown = W.load(self.hub, "nope", self.base, "999")
+        self.assertEqual((W.get(unknown, "models.worker.runtime"), unknown["sources"]["models.worker.runtime"]), ("opencode", "kit"))
+        self.assertEqual(W.load(self.root / "missing")["sources"]["models.worker.runtime"], "kit")
 
     def test_project_found_by_root_too(self):
         self.assertEqual(W.get(W.load(self.hub, str(self.base)), "models.worker.runtime"), "claude")
