@@ -50,6 +50,22 @@ mirror in line with it, writes the plan as a fleet ticket, and delivers (GitLab 
 in `~/.claude/ejadtask.json` (see `profile.example.json`); credentials are read from the environment only (`HR_EMAIL`,
 `HR_PASS`, `PLANE_API_KEY`) and never written anywhere.
 
+## Layered settings
+
+Which model and runtime a ticket runs with is resolved in one place, `wv-bin/wv-settings.py`, from four layers, lowest to highest:
+kit defaults (`wv-settings-defaults.json`), global (the hub's `specs/worker-fleet.config.json`), project (its entry in the hub's
+`specs/projects.json`, `fleet.settings`) and ticket (`settings` in the project's `job/stage/<NNN>.json`). A layer has an `enabled` flag
+(a missing flag means on; `false` skips the whole layer) and only overrides the keys it lists. Dicts merge key by key; values and lists
+are replaced whole. `dashboard.port` and secrets are never layered.
+
+- Read: `python wv-bin/wv-settings.py resolve --hub HUB --project NAME --base PROJECT --ticket 012 [--key models.worker.runtime]`
+  prints the effective settings and which layer set each key. Node scripts use `.claude/scripts/wv-settings.cjs`.
+- Write: `... set --scope project|ticket ... --values '{"models":{"worker":{"runtime":"claude"}}}' --enabled true`, or the
+  "Settings layers" section on the dashboard's Agents tab. A change applies from the next agent start, never mid-run.
+- Old headers: `python wv-bin/wv-migrate-settings.py` (dry run; `--apply` writes) moves a project config that differs from the hub into
+  a disabled project layer and a not-done ticket's `**Worker harness:**` / `**Worker model:**` header into its ticket layer. After that
+  a header in `rd.md` overrides nothing.
+
 ## Safety
 
 - Remote access (a Cloudflare tunnel) is **off** by default. `bash .claude/scripts/tunnel.sh on | off | status` is the one
