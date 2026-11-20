@@ -11,12 +11,10 @@ const { spawn } = require('node:child_process');
 
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
-let model = opt('--model');
+const model = opt('--model') || 'sonnet';
 const resume = opt('--resume');
 const answerFile = opt('--answer');
 const [slug, briefFile] = args;
-// the planner's model: --model wins, else the layered setting models.planner.claude.model (ticket > project > global), else sonnet
-if (!model) { const m = require('./wv-settings.cjs').setting('models.planner.claude.model', { ticket: (slug || '').slice(0, 3), fallback: 'sonnet' }); model = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(m || '') ? m : 'sonnet'; }
 if (!slug || !/^\d{3}-[a-z0-9-]+$/.test(slug) || (!briefFile && !resume)) {
   console.error('usage: node .claude/scripts/plan.cjs <NNN-slug> <brief-file> [--model sonnet] [--resume <session-id> --answer <file>]');
   process.exit(2);
