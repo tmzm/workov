@@ -14,6 +14,7 @@ Pure functions plus a thin CLI, so .cjs and .sh callers shell out to it. Resolve
 import argparse
 import copy
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -89,11 +90,16 @@ def get(result, dotted, default=None):
 
 # ---- loading the layers from disk -------------------------------------------------------------------------------------------
 
+def _norm(p):
+    return os.path.normcase(os.path.abspath(str(p))) if p else ""
+
+
 def _project_entry(hub, project):
+    """The projects.json row of a project, found by its name or by its root folder (slash style and case do not matter)."""
     data = read_json(Path(hub) / "specs" / "projects.json")
     rows = data.get("projects") if isinstance(data.get("projects"), list) else []
     for row in rows:
-        if isinstance(row, dict) and project and project in (row.get("name"), row.get("root")):
+        if isinstance(row, dict) and project and (project == row.get("name") or (row.get("root") and _norm(project) == _norm(row.get("root")))):
             return row
     return {}
 

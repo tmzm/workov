@@ -109,6 +109,9 @@ class Load(unittest.TestCase):
     def test_project_found_by_root_too(self):
         self.assertEqual(W.get(W.load(self.hub, str(self.base)), "models.worker.runtime"), "claude")
 
+    def test_project_root_matches_despite_slash_style(self):
+        self.assertEqual(W.get(W.load(self.hub, str(self.base).replace("\\", "/")), "models.worker.runtime"), "claude")
+
     def test_cli_key(self):
         import contextlib
         import io
