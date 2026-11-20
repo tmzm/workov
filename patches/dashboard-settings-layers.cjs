@@ -168,7 +168,7 @@ if (!h.includes('id="wv-layers"')) {
           const nameTd = el('td', r.name, 'padding:6px 8px;font-weight:600'); if (locked) { nameTd.title = 'Runs once for the whole fleet: set it in the Global scope.'; nameTd.append(el('span', ' (global only)', 'font-weight:400;opacity:.7')); }
           const eff = d.effective[r.name] || {}; const effTd = el('td', null, 'padding:6px 8px');
           const ocm = get(eff, ['opencode', 'model']), clm = get(eff, ['claude', 'model']);
-          const rt = r.name === 'worker' ? get(eff, ['runtime']) || 'opencode' : null;
+          const rt = r.name === 'worker' || r.name === 'planner' ? get(eff, ['runtime']) || (r.name === 'planner' ? 'claude' : 'opencode') : null;
           effTd.append(el('span', rt === 'claude' ? 'Claude ' + (clm || 'sonnet') : (ocm || (clm ? 'Claude ' + clm : 'default')), 'font-family:monospace'));
           const bk = rt === 'claude' ? 'models.' + r.name + '.claude.model' : 'models.' + r.name + '.opencode.model'; const bd = badge(bk) || badge('models.' + r.name + '.claude.model'); if (bd) effTd.append(bd);
           tr.append(nameTd, effTd);
@@ -181,10 +181,10 @@ if (!h.includes('id="wv-layers"')) {
           };
           field(['opencode', 'model'], 'text', get(eff, ['opencode', 'model']) || 'provider/model'); field(['claude', 'model'], 'text', get(eff, ['claude', 'model']) || 'sonnet'); field(['claude', 'effort'], 'effort');
           table.append(tr);
-          if (r.name === 'worker') {
-            const tr2 = el('tr'); const td0 = el('td', 'worker runtime', 'padding:2px 8px 6px;opacity:.8'); const td1 = el('td'); const sel = el('select');
-            [['', 'inherit'], ['opencode', 'OpenCode'], ['claude', 'Claude']].forEach(([v, t]) => { const o = el('option', t); o.value = v; sel.append(o); }); const cr = get(d.layer.models.worker || {}, ['runtime']) || ''; sel.value = cr; sel.setAttribute('aria-label', 'worker runtime');
-            td1.append(sel); tr2.append(td0, td1); table.append(tr2); inputs.push({ role: 'worker', path: ['runtime'], inp: sel, initial: cr });
+          if (r.name === 'worker' || r.name === 'planner') {
+            const tr2 = el('tr'); const td0 = el('td', r.name + ' runtime', 'padding:2px 8px 6px;opacity:.8'); const td1 = el('td'); const sel = el('select');
+            [['', 'inherit'], ['opencode', 'OpenCode'], ['claude', 'Claude']].forEach(([v, t]) => { const o = el('option', t); o.value = v; sel.append(o); }); const cr = get(d.layer.models[r.name] || {}, ['runtime']) || ''; sel.value = cr; sel.setAttribute('aria-label', r.name + ' runtime');
+            td1.append(sel); tr2.append(td0, td1); table.append(tr2); inputs.push({ role: r.name, path: ['runtime'], inp: sel, initial: cr });
           }
         });
         body.append(table);

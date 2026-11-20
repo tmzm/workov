@@ -166,8 +166,8 @@ def clean_models(models, scope):
         r = {}
         for k, v in spec.items():
             if k == "runtime":
-                if role != "worker" or v not in ("", "claude", "opencode"):
-                    raise ValueError("Only the worker has a runtime, and it is claude or opencode.")
+                if role not in ("worker", "planner") or v not in ("", "claude", "opencode"):
+                    raise ValueError("Only the worker and the planner have a runtime, and it is claude or opencode.")
                 r[k] = v or None
             elif k in ("opencode", "claude") and isinstance(v, dict):
                 sub = {}

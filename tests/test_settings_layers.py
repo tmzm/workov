@@ -172,6 +172,7 @@ class CleanModels(unittest.TestCase):
                               "tester": {"opencode": {"model": "a/b"}}}, "project")
         self.assertEqual(out["worker"], {"runtime": "claude", "opencode": {"model": "nvidia/big"}, "claude": {"model": None, "effort": "high"}})
         self.assertEqual(out["tester"], {"opencode": {"model": "a/b"}})
+        self.assertEqual(W.clean_models({"planner": {"runtime": "opencode"}}, "ticket"), {"planner": {"runtime": "opencode"}})
 
     def test_global_only_roles_are_refused_below_global(self):
         for role in W.GLOBAL_ONLY_ROLES:
