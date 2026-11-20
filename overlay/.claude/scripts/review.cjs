@@ -16,7 +16,7 @@ const { spawn, execFileSync } = require('node:child_process');
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args.splice(i, 2)[1] : d; };
-const model = opt('--model', 'sonnet');
+let model = opt('--model', null);
 const by = opt('--by', 'claude');
 const nnn = args[0];
 if (!/^\d{3}$/.test(nnn || '') || !['claude', 'fleet', 'both'].includes(by)) {
@@ -24,6 +24,8 @@ if (!/^\d{3}$/.test(nnn || '') || !['claude', 'fleet', 'both'].includes(by)) {
   process.exit(2);
 }
 if (!fs.existsSync('specs/worker-fleet.config.json')) { console.error('run it from the fleet folder'); process.exit(2); }
+// the Claude model: --model wins, else the layered setting models.reviewer.claude.model (ticket > project > global), else sonnet
+if (!model) { const m = require('./wv-settings.cjs').setting('models.reviewer.claude.model', { ticket: nnn, fallback: 'sonnet' }); model = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(m || '') ? m : 'sonnet'; }
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const slug = fs.readdirSync('specs/tickets').find((d) => d.startsWith(`${nnn}-`));
@@ -89,7 +91,7 @@ function runClaude() {
 function runFleet() {
   return new Promise((resolve) => {
     let fm = 'opencode-go/deepseek-v4-pro';
-    try { fm = JSON.parse(fs.readFileSync('specs/worker-fleet.config.json', 'utf8')).models.reviewer.opencode.model || fm; } catch {}
+    fm = require('./wv-settings.cjs').setting('models.reviewer.opencode.model', { ticket: nnn, fallback: fm }) || fm;
     const pf = `job/review-prompt-${nnn}.md`;
     fs.writeFileSync(pf, `# Final review of ticket ${slug}\n\nBranch \`${branch}\`; its worktree: ${where}.\nRead \`CLAUDE.md\`, \`${tdir}/rd.md\` and \`${tdir}/eval.md\`, then review \`git diff origin/main...${branch}\` (ignore \`specs/tickets/\` except \`evidence/\`). Read each changed file in full and the callers of changed functions.\nLook for real defects only: wrong logic, null paths, unhandled errors, stale state, missing loading/empty/error states, wrong API use, missing translations, accessibility breaks, repo-rule violations, missing tests, behaviour that contradicts the ticket. Prove each with concrete inputs; drop what you cannot. Do not edit any file.\n\nYour final message must end with a line \`RESULT: clean\` or \`RESULT: findings\`, and for findings a numbered list placed AFTER that line: file:line, the scenario, the fix.\n`);
     line(`▶ fleet reviewer (${fm}) of ${branch}`);

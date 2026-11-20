@@ -122,5 +122,46 @@ class Load(unittest.TestCase):
         self.assertEqual((code, out.getvalue().strip()), (0, "opus"))
 
 
+class NodeHelper(unittest.TestCase):
+    """overlay/.claude/scripts/wv-settings.cjs: the same answers for node callers, in a scratch home folder."""
+    HELPER = Path(__file__).resolve().parent.parent / "overlay" / ".claude" / "scripts" / "wv-settings.cjs"
+
+    def setUp(self):
+        import shutil
+        if not shutil.which("node"):
+            self.skipTest("node is not installed")
+        self.tmp = tempfile.TemporaryDirectory()
+        r = Path(self.tmp.name)
+        self.home, self.hub, self.proj = r / "home", r / "hub", r / "proj"
+        (self.home / ".workov").mkdir(parents=True)
+        (self.home / ".wv-bin").mkdir()
+        for f in ("wv-settings.py", "wv-settings-defaults.json"):
+            (self.home / ".wv-bin" / f).write_bytes((BIN / f).read_bytes())
+        (self.hub / "specs").mkdir(parents=True)
+        (self.proj / "job" / "stage").mkdir(parents=True)
+        (self.home / ".workov" / "hub.json").write_text(json.dumps({"root": str(self.hub)}), encoding="utf-8")
+        (self.hub / "specs" / "worker-fleet.config.json").write_text(json.dumps(GLOBAL), encoding="utf-8")
+        (self.proj / "job" / "stage" / "012.json").write_text(json.dumps({"settings": {"models": {"reviewer": {"opencode": {"model": "ticket/rev"}}}}}), encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def ask(self, key, ticket=None, fallback="FB"):
+        import os
+        import subprocess
+        code = "console.log(require(%s).setting(%s, {ticket: %s, fallback: %s}))" % tuple(json.dumps(x) for x in (self.HELPER.as_posix(), key, ticket, fallback))
+        env = dict(os.environ, USERPROFILE=str(self.home), HOME=str(self.home))
+        return subprocess.run(["node", "-e", code], cwd=self.proj, env=env, capture_output=True, text=True).stdout.strip()
+
+    def test_global_ticket_and_fallback(self):
+        self.assertEqual(self.ask("models.reviewer.opencode.model"), "nvidia/ultra")
+        self.assertEqual(self.ask("models.reviewer.opencode.model", "012"), "ticket/rev")
+        self.assertEqual(self.ask("models.nobody.model"), "FB")
+
+    def test_no_hub_gives_the_fallback(self):
+        (self.home / ".workov" / "hub.json").unlink()
+        self.assertEqual(self.ask("models.reviewer.opencode.model"), "FB")
+
+
 if __name__ == "__main__":
     unittest.main()
