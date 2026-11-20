@@ -311,6 +311,15 @@ class DispatcherRuntime(unittest.TestCase):
             self.assertEqual(rec["sources"]["models.worker.opencode.model"], "ticket")
             self.assertEqual(rec["sources"]["models.worker.runtime"], "kit")
 
+    def test_subagent_models_from_project_or_ticket_layers_only(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.ticket(d)
+            self.layer(d, {"models": {"tester": {"opencode": {"model": "t/own"}}, "router": {"opencode": {"model": "r/x"}},
+                                      "worker": {"opencode": {"model": "w/x"}}, "reviewer": {"opencode": {"model": "v/x"}}}})
+            cfg = {"models": {"tester": {"opencode": {"model": "g/tester"}}, "merger": {"opencode": {"model": "g/merger"}}}}
+            over = DISPATCH.agent_model_overrides(DISPATCH.settings_for(d, "001-x", cfg))
+            self.assertEqual(over, {"tester": {"model": "t/own"}})  # merger is global (stays in its agent file); router, worker, reviewer are not subagents here
+
     def test_bad_model_value_falls_back(self):
         with tempfile.TemporaryDirectory() as d:
             self.ticket(d)

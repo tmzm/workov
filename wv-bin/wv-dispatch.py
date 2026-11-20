@@ -232,6 +232,23 @@ def worker_runtime(base, slug, cfg):
     return runtime_of(settings_for(base, slug, cfg))
 
 
+# roles the dispatcher does not hand to the worker's session: the worker has its own -m, the reviewer and planner are launched by their own scripts
+SUBAGENT_SKIP = ("worker", "reviewer", "planner", "router", "watchdog", "designer")
+
+
+def agent_model_overrides(res):
+    """The OpenCode subagents (tester, teammate, reproducer, merger, checker, ...) whose model a project or ticket layer sets, as the `agent`
+    block of an inline OpenCode config. Models that only the global config or the kit set stay where they are, in the agent files."""
+    out = {}
+    for role, spec in (res["effective"].get("models") or {}).items():
+        if role in SUBAGENT_SKIP or not isinstance(spec, dict):
+            continue
+        m = (spec.get("opencode") or {}).get("model")
+        if m and res["sources"].get("models.%s.opencode.model" % role) in ("project", "ticket"):
+            out[role] = {"model": m}
+    return out
+
+
 def ledger_settings(res, runtime, model):
     """what the worker was started with and which layer set each worker setting, for the ledger entry (what ran is on record)"""
     return {"runtime": runtime, "model": model, "sources": {k: v for k, v in res["sources"].items() if k == "harness" or k.startswith("models.worker.")}}
@@ -333,6 +350,14 @@ def launch(root, name, num, slug, dry):
     env["PATH"] = wvbin + os.pathsep + env.get("PATH", "")
     env["BASH_ENV"] = wvbin.replace("\\", "/") + "/wv-bashenv.sh"
     env["WV_APPROVALS"] = "auto"
+    over = agent_model_overrides(res)  # a project's or ticket's own models for the subagents, applied to this worker's OpenCode only
+    if over and runtime != "claude":
+        try:
+            inline = json.loads(env.get("OPENCODE_CONFIG_CONTENT") or "{}")
+        except ValueError:
+            inline = {}
+        inline.setdefault("agent", {}).update(over)
+        env["OPENCODE_CONFIG_CONTENT"] = json.dumps(inline)
     # a private opencode server (`--standalone`) takes the session directory from PWD, and this process inherits the hub loop shell's
     # PWD: the worker would be recorded under the hub folder, not seen as running by the next cycle, and launched again every few minutes
     env["PWD"] = str(base).replace("\\", "/")
