@@ -26,7 +26,7 @@
   #log time { color:var(--muted); opacity:.75; margin-right:7px; font-variant-numeric:tabular-nums; }
   .lbl { position:fixed; left:0; top:0; transform:translate(-50%,-100%); pointer-events:none; text-align:center; white-space:nowrap; will-change:transform; }
   .lbl .name { display:inline-block; background:#fff; color:var(--ink); border:2px solid #2a2140; border-radius:999px; padding:1px 10px; font-weight:700; font-size:11px; box-shadow:0 3px 8px rgba(0,0,0,.18); }
-  .lbl .name small { font-weight:500; color:var(--muted); margin-left:5px; }
+  .lbl .name small { display:none; }
   .lbl .say { display:block; margin:4px auto 0; max-width:210px; overflow:hidden; text-overflow:ellipsis; background:#2a2140; color:#fff6e6; border-radius:9px; padding:2px 9px; font-size:10.5px; font-weight:600; }
   .lbl .say.you { background:#ff5a4e; color:#fff; }
   .lbl .say.zzz { background:#fff; color:#6f5f86; font-weight:500; }
@@ -42,9 +42,31 @@
     .note { display:none; }
   }
   @media (prefers-reduced-motion: reduce) { button { transition:none; } }
+
+  #boot { position:fixed; inset:0; z-index:100; display:grid; place-content:center; justify-items:center; gap:14px; background:linear-gradient(#7cc8ff,#cdeeff 62%,#fff0d6); color:var(--ink); transition:opacity .35s ease; }
+  #boot.gone { opacity:0; pointer-events:none; }
+  #boot .spin { width:44px; height:44px; border-radius:50%; border:4px solid rgba(42,33,64,.18); border-top-color:#ff5a4e; animation:wvspin .9s linear infinite; }
+  #boot p { margin:0; font-weight:800; font-size:18px; } #boot small { color:var(--muted); }
+  @keyframes wvspin { to { transform:rotate(360deg); } }
+  .lbl .say { display:none; }
+  .lbl .name::before { content:""; display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; background:#a79fb8; }
+  .lbl[data-mode=typing] .name::before { background:#f2b705; animation:wvpulse 1.2s ease-in-out infinite; }
+  .lbl[data-mode=sleep] .name::before { background:#5cc8ff; } .lbl[data-mode=walk] .name::before { background:#5fcf6b; }
+  .lbl[data-mode=hand] .name { border-color:#ff5a4e; } .lbl[data-mode=hand] .name::before { background:#ff5a4e; animation:wvpulse 1s ease-in-out infinite; }
+  .lbl.hot .name { outline:3px solid #ff5a4e; outline-offset:1px; }
+  @keyframes wvpulse { 50% { opacity:.3; } }
+  #card { position:fixed; right:16px; bottom:56px; width:min(320px,calc(100vw - 32px)); max-height:42vh; overflow:auto; display:none; background:var(--paper); border:2px solid var(--line); border-radius:var(--r); box-shadow:0 10px 28px rgba(42,33,64,.18); padding:12px 14px; }
+  #card.on { display:block; }
+  #card h2 { margin:0 0 2px; font-size:15px; } #card .sub { color:var(--muted); font-size:12px; margin-bottom:8px; }
+  #card .now { margin:0 0 8px; font-weight:600; overflow-wrap:anywhere; } #card ol { margin:0; padding:0; list-style:none; font-size:12px; color:var(--muted); } #card li { padding:2px 0; overflow-wrap:anywhere; }
+  #card .hintx { margin-top:8px; font-size:11px; color:var(--muted); }
+  .night #card { background:rgba(42,33,64,.94); color:#fff6e6; border-color:#fff6e6; } .night #card .sub, .night #card ol, .night #card .hintx { color:#d9cdf0; }
+  @media (max-width:640px) { #card { bottom:76px; } }
+  @media (prefers-reduced-motion: reduce) { #boot .spin, .lbl .name::before { animation:none !important; } }
 </style>
 </head>
 <body>
+<div id="boot" role="status" aria-live="polite"><div class="spin" aria-hidden="true"></div><p>Connecting to your fleet</p><small id="boot-sub">Reading tickets and agents</small></div>
 <div class="ts ts-top"></div><div class="ts ts-bot"></div>
 <div id="hud">
   <h1>Workov toy office</h1>
@@ -62,6 +84,7 @@
 <div id="log"><div>Activity</div></div>
 <div class="note">Sample data. The real page would read the live board.</div>
 <div id="labels"></div>
+<div id="card" role="status" aria-live="polite"></div>
 
 <script type="importmap">{"imports":{"three":"./three.module.js"}}</script>
 <script type="module">
@@ -349,7 +372,7 @@ const shortModel = (m) => String(m || '').split('/').pop().replace(/^claude[- ]?
 let prev = null, roleModel = {}, liveOk = false, lastRouter = '';
 async function pollLive() {
   const [P, S, R] = await Promise.all([api('/api/wv/projects'), api('/api/state'), api('/api/wv/router').catch(() => null)]);
-  if (!liveOk) { liveOk = true; clearInterval(sampleTimer); logEl.replaceChildren(logEl.firstElementChild); if (noteEl) noteEl.textContent = 'Live: reading your Workov board.'; document.querySelector('#hud p').textContent = 'Your real tickets and agents. Drag to look around, wheel to zoom.'; }
+  if (!liveOk) { liveOk = true; agents.forEach(a => { a.hist = []; a.msgs = []; a.say.textContent = ''; }); clearInterval(sampleTimer); logEl.replaceChildren(logEl.firstElementChild); if (noteEl) noteEl.textContent = 'Live: reading your Workov board.'; document.querySelector('#hud p').textContent = 'Your real tickets and agents. Drag to look around, wheel to zoom.'; }
   const tickets = []; for (const p of (P.projects || [])) for (const t of (p.tickets || [])) tickets.push({ key: p.name + '/' + t.id, id: t.id, project: p.name, title: t.title, status: t.status, awaiting: !!t.awaiting, stage: STAGE_OF[t.status] || (NEEDS.has(t.status) ? 'Building' : 'Draft') });
   const count = {}; for (const t of tickets) count[t.stage] = (count[t.stage] || 0) + 1;
   for (const st of ['Draft', 'Plan', 'Design', 'Todo', 'Building', 'Review', 'Deliver', 'Done']) hudCount(st, count[st] || 0);
@@ -364,8 +387,8 @@ async function pollLive() {
   const everySteps = Object.values(steps).flat();
   ['worker 1', 'worker 2', 'worker 3'].forEach((n, i) => {
     const a = byName(n), w = builders[i];
-    if (w) { const tk = tickets.find(t => t.id === w.ticket) || {}; setName(a, (w.project ? w.project + ' ' : '') + w.ticket, n); setMode(a, 'typing', lastTool(steps[w.ticket] || [], /worker|build/i) || (w.phase || 'working')); }
-    else { setName(a, n, roleModel.worker || 'free'); setMode(a, 'idle', 'free'); }
+    if (w) { const ini = String(w.project || '').split(/\s+/).map(x => x[0] || '').join('').slice(0, 3).toUpperCase(); setName(a, (String(w.ticket).match(/^(?:[A-Za-z]+-)?[0-9]{3}/) || [String(w.ticket)])[0], n); a.detail = (w.project ? w.project + ' · ' : '') + w.ticket; setMode(a, 'typing', lastTool(steps[w.ticket] || [], /worker|build/i) || (w.phase || 'working')); }
+    else { setName(a, n, roleModel.worker || 'free'); a.detail = ''; setMode(a, 'idle', 'free'); }
   });
   const pl = byName('planner'), d = byName('designer'), rv = byName('reviewer'), ts = byName('tester'), me = byName('You'), rt0 = byName('router'), wd = byName('watchdog');
   writers.length ? setMode(pl, 'typing', 'writing ' + writers[0].ticket) : setMode(pl, 'idle', (count.Draft || 0) ? (count.Draft + ' draft' + (count.Draft > 1 ? 's' : '') + ' waiting') : 'nothing to plan');
@@ -401,8 +424,18 @@ async function loadModels() {
   } catch (e) { /* the models stay as the sample shows them */ }
 }
 (async () => {
-  try { await pollLive(); loadModels(); setInterval(() => pollLive().catch(() => { if (noteEl) noteEl.textContent = 'Live feed paused, retrying.'; }), 4000); }
-  catch (e) { for (let i = 0; i < 5; i++) logLine(); sampleTimer = setInterval(logLine, 4500); }
+  const hideBoot = () => { const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 450); } };
+  const sub = document.getElementById('boot-sub'), say = (t) => { if (sub) sub.textContent = t; };
+  const slow = setTimeout(() => say('Still connecting, the dashboard is slow to answer'), 7000);
+  // Sample data is only for the page opened on its own (no dashboard behind it). With a dashboard, the loader stays until the real data arrives.
+  for (let tries = 0; ; tries++) {
+    try { await pollLive(); clearTimeout(slow); hideBoot(); loadModels(); setInterval(() => pollLive().catch(() => { if (noteEl) noteEl.textContent = 'Live feed paused, retrying.'; }), 4000); return; }
+    catch (e) {
+      if (e instanceof TypeError || / (404|405)$/.test(String(e && e.message))) { clearTimeout(slow); hideBoot(); for (let i = 0; i < 5; i++) logLine(); sampleTimer = setInterval(logLine, 4500); return; }
+      if (tries >= 3) say('Could not read your fleet yet (' + String(e && e.message || e).slice(0, 80) + '). Retrying...');
+      await new Promise(r => setTimeout(r, tries < 10 ? 2500 : 8000));
+    }
+  }
 })();
 
 // ---------- loop ----------
@@ -411,6 +444,25 @@ function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h
 addEventListener('resize', resize); resize();
 const clock = new THREE.Clock();
 function place(el, pos) { v.copy(pos).project(camera); const ok = v.z < 1; el.style.display = ok ? '' : 'none'; el.style.left = ((v.x * 0.5 + 0.5) * innerWidth) + 'px'; el.style.top = ((-v.y * 0.5 + 0.5) * innerHeight) + 'px'; }
+// ---------- who is who: hover or click a person to read what they are doing ----------
+function sayTo(a, text) { if (a.say.textContent === text) return; a.say.textContent = text; (a.hist = a.hist || []).unshift(text); if (a.hist.length > 7) a.hist.pop(); }
+const card = document.getElementById('card'); let hotA = null, pinA = null, downAt = null;
+const MODE_LABEL = { typing: 'Working', idle: 'Idle', sleep: 'Asleep', hand: 'Needs your answer', walk: 'On the move' };
+function pickAgent(x, y) { let best = null, bd = 56 * 56; for (const a of agents) { v.set(a.p.position.x, a.top * 0.55, a.p.position.z).project(camera); if (v.z > 1) continue; const px = (v.x * 0.5 + 0.5) * innerWidth, py = (-v.y * 0.5 + 0.5) * innerHeight, d = (px - x) ** 2 + (py - y) ** 2; if (d < bd) { bd = d; best = a; } } return best; }
+function paintCard() {
+  const a = pinA || hotA; card.classList.toggle('on', !!a);
+  for (const x of agents) x.lbl.classList.toggle('hot', x === a);
+  if (!a) return; card.textContent = '';
+  const nm = a.lbl.querySelector('.name'), mk = (tag, text, cls) => { const e = document.createElement(tag); e.textContent = text; if (cls) e.className = cls; return e; };
+  const ol = document.createElement('ol'); (a.hist || []).slice(1).forEach(t => ol.append(mk('li', t)));
+  card.append(mk('h2', nm.childNodes[0] ? nm.childNodes[0].textContent : a.o.name), mk('div', (nm.querySelector('small') || {}).textContent ? nm.querySelector('small').textContent + ' · ' + (MODE_LABEL[a.p.userData.mode] || '') : (MODE_LABEL[a.p.userData.mode] || ''), 'sub'), ...(a.detail ? [mk('div', a.detail, 'sub')] : []), mk('p', a.say.textContent || 'Nothing yet', 'now'), ol, mk('div', pinA ? 'Pinned. Click empty space or press Esc to close.' : 'Click to keep this open.', 'hintx'));
+}
+renderer.domElement.addEventListener('pointermove', e => { if (drag) return; const a = pickAgent(e.clientX, e.clientY); if (a !== hotA) { hotA = a; paintCard(); } renderer.domElement.style.cursor = a ? 'pointer' : ''; });
+renderer.domElement.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('click', e => { if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 5) return; const a = pickAgent(e.clientX, e.clientY); pinA = a && a !== pinA ? a : null; hotA = a; paintCard(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && pinA) { pinA = null; paintCard(); } });
+setInterval(() => { if (pinA || hotA) paintCard(); }, 800);
+
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   if (spin) cam.az += dt * 0.25;
@@ -424,14 +476,14 @@ function frame() {
       u.mixer.update(dt);
       if (u.mode === 'walk') {
         const tgt = PATH[rt.i], dx = tgt[0] - a.p.position.x, dz = tgt[1] - a.p.position.z, dist = Math.hypot(dx, dz);
-        if (dist > 0.08) { const sp = 2.8 * dt; a.p.position.x += dx / dist * Math.min(sp, dist); a.p.position.z += dz / dist * Math.min(sp, dist); a.p.rotation.y = Math.atan2(dx, dz); playClip(u, carry.visible ? 'holding-both' : 'walk'); a.say.textContent = tgt[2]; }
+        if (dist > 0.08) { const sp = 2.8 * dt; a.p.position.x += dx / dist * Math.min(sp, dist); a.p.position.z += dz / dist * Math.min(sp, dist); a.p.rotation.y = Math.atan2(dx, dz); playClip(u, carry.visible ? 'holding-both' : 'walk'); sayTo(a, tgt[2]); }
         else { playClip(u, carry.visible ? 'holding-both' : 'idle'); rt.wait -= dt; if (rt.wait <= 0) { rt.i = (rt.i + 1) % PATH.length; rt.wait = 1.6; if (rt.i === 0) carry.visible = true; if (rt.i === 3) carry.visible = false; } }
       } else {
         playClip(u, a.clip);
         if (u.mode === 'sleep') { u.model.rotation.x = 0.28 + Math.sin(t * 1.2) * 0.03; a.say.classList.add('zzz'); }
-        if (a.msgs.length && t > a.next) { a.say.textContent = a.msgs[a.mi++ % a.msgs.length]; a.next = t + 2.2 + Math.random() * 2.5; }
+        if (a.msgs.length && t > a.next) { sayTo(a, a.msgs[a.mi++ % a.msgs.length]); a.next = t + 2.2 + Math.random() * 2.5; }
       }
-      place(a.lbl, v.set(a.p.position.x, a.top, a.p.position.z));
+      a.lbl.dataset.mode = u.mode; place(a.lbl, v.set(a.p.position.x, a.top, a.p.position.z));
       continue;
     }
     if (u.mode === 'typing') { arms[0].rotation.x = -1.25 + Math.sin(t * 14 + u.phase) * 0.12; arms[1].rotation.x = -1.25 + Math.sin(t * 13 + u.phase + 1.7) * 0.12; head.rotation.x = Math.sin(t * 1.6 + u.phase) * 0.07; }
@@ -440,14 +492,14 @@ function frame() {
     else if (u.mode === 'hand') { arms[1].rotation.z = -2.7 + Math.sin(t * 6) * 0.25; arms[1].rotation.x = 0; arms[0].rotation.x = -1.2; head.rotation.y = Math.sin(t * 1.5) * 0.3; }
     if (u.mode === 'walk') {
       const tgt = PATH[rt.i], dx = tgt[0] - a.p.position.x, dz = tgt[1] - a.p.position.z, dist = Math.hypot(dx, dz);
-      if (dist > 0.08) { const sp = 2.6 * dt; a.p.position.x += dx / dist * Math.min(sp, dist); a.p.position.z += dz / dist * Math.min(sp, dist); a.p.rotation.y = Math.atan2(dx, dz); const sw = Math.sin(t * 9) * 0.6; u.legs[0].rotation.x = sw; u.legs[1].rotation.x = -sw; arms[0].rotation.x = -sw * 0.8; arms[1].rotation.x = sw * 0.8; a.p.position.y = Math.abs(Math.sin(t * 9)) * 0.05; a.say.textContent = tgt[2]; }
+      if (dist > 0.08) { const sp = 2.6 * dt; a.p.position.x += dx / dist * Math.min(sp, dist); a.p.position.z += dz / dist * Math.min(sp, dist); a.p.rotation.y = Math.atan2(dx, dz); const sw = Math.sin(t * 9) * 0.6; u.legs[0].rotation.x = sw; u.legs[1].rotation.x = -sw; arms[0].rotation.x = -sw * 0.8; arms[1].rotation.x = sw * 0.8; a.p.position.y = Math.abs(Math.sin(t * 9)) * 0.05; sayTo(a, tgt[2]); }
       else { u.legs.forEach(l => l.rotation.x = 0); arms.forEach(x => x.rotation.x = carry.visible ? -1.1 : -0.2); rt.wait -= dt; if (rt.wait <= 0) { rt.i = (rt.i + 1) % PATH.length; rt.wait = 1.6; if (rt.i === 0) carry.visible = true; if (rt.i === 3) carry.visible = false; } }
     }
     if (u.mode === 'idle' && u.standing) { u.legs.forEach(l => l.rotation.x = 0); }
     // bubble text
-    if (a.msgs.length && u.mode !== 'walk' && t > a.next) { a.say.textContent = a.msgs[a.mi++ % a.msgs.length]; a.next = t + 2.2 + Math.random() * 2.5; }
+    if (a.msgs.length && u.mode !== 'walk' && t > a.next) { sayTo(a, a.msgs[a.mi++ % a.msgs.length]); a.next = t + 2.2 + Math.random() * 2.5; }
     if (u.mode === 'sleep') { a.say.classList.add('zzz'); }
-    place(a.lbl, v.set(a.p.position.x, a.top, a.p.position.z));
+    a.lbl.dataset.mode = u.mode; place(a.lbl, v.set(a.p.position.x, a.top, a.p.position.z));
   }
   for (const z of zoneLabels) place(z.el, z.pos);
   renderer.render(scene, camera);
