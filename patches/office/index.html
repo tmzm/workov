@@ -59,6 +59,7 @@
   #card.on { display:block; }
   #card h2 { margin:0 0 2px; font-size:15px; } #card .sub { color:var(--muted); font-size:12px; margin-bottom:8px; }
   #card .now { margin:0 0 8px; font-weight:600; overflow-wrap:anywhere; } #card ol { margin:0; padding:0; list-style:none; font-size:12px; color:var(--muted); } #card li { padding:2px 0; overflow-wrap:anywhere; }
+  #card .model { margin:0 0 8px; font-family:ui-monospace,Consolas,monospace; font-size:12px; overflow-wrap:anywhere; } #card .model b { font-family:inherit; }
   #card .hintx { margin-top:8px; font-size:11px; color:var(--muted); }
   .night #card { background:rgba(42,33,64,.94); color:#fff6e6; border-color:#fff6e6; } .night #card .sub, .night #card ol, .night #card .hintx { color:#d9cdf0; }
   @media (max-width:640px) { #card { bottom:76px; } }
@@ -387,8 +388,8 @@ async function pollLive() {
   const everySteps = Object.values(steps).flat();
   ['worker 1', 'worker 2', 'worker 3'].forEach((n, i) => {
     const a = byName(n), w = builders[i];
-    if (w) { const ini = String(w.project || '').split(/\s+/).map(x => x[0] || '').join('').slice(0, 3).toUpperCase(); setName(a, (String(w.ticket).match(/^(?:[A-Za-z]+-)?[0-9]{3}/) || [String(w.ticket)])[0], n); a.detail = (w.project ? w.project + ' · ' : '') + w.ticket; setMode(a, 'typing', lastTool(steps[w.ticket] || [], /worker|build/i) || (w.phase || 'working')); }
-    else { setName(a, n, roleModel.worker || 'free'); a.detail = ''; setMode(a, 'idle', 'free'); }
+    if (w) { const ini = String(w.project || '').split(/\s+/).map(x => x[0] || '').join('').slice(0, 3).toUpperCase(); setName(a, (String(w.ticket).match(/^(?:[A-Za-z]+-)?[0-9]{3}/) || [String(w.ticket)])[0], n); a.detail = (w.project ? w.project + ' · ' : '') + w.ticket; a.project = w.project || ''; a.ticketNum = (String(w.ticket).match(/[0-9]{3}/) || [''])[0]; setMode(a, 'typing', lastTool(steps[w.ticket] || [], /worker|build/i) || (w.phase || 'working')); }
+    else { setName(a, n, roleModel.worker || 'free'); a.detail = ''; a.project = ''; a.ticketNum = ''; setMode(a, 'idle', 'free'); }
   });
   const pl = byName('planner'), d = byName('designer'), rv = byName('reviewer'), ts = byName('tester'), me = byName('You'), rt0 = byName('router'), wd = byName('watchdog');
   writers.length ? setMode(pl, 'typing', 'writing ' + writers[0].ticket) : setMode(pl, 'idle', (count.Draft || 0) ? (count.Draft + ' draft' + (count.Draft > 1 ? 's' : '') + ' waiting') : 'nothing to plan');
@@ -419,7 +420,7 @@ async function pollLive() {
 async function loadModels() {
   try {
     const r = await api('/api/agent-roster'), pick = (k) => { const a = (r.agents || []).find(x => x.runtime === r.harness && x.agent.toLowerCase().includes(k)) || (r.agents || []).find(x => x.agent.toLowerCase().includes(k)); return a ? shortModel(a.model) : ''; };
-    roleModel = { worker: pick('worker') };
+    roleModel = { worker: pick('worker') }; for (const k of ['router', 'teammate', 'reviewer', 'reproducer', 'tester', 'merger', 'checker', 'watchdog', 'planner']) { const m = pick(k); if (m) roleModel[k] = m; }
     for (const [n, k] of [['tester', 'tester'], ['planner', 'plan'], ['designer', 'design'], ['reviewer', 'review'], ['router', 'router'], ['watchdog', 'watchdog']]) { const m = pick(k), a = byName(n); if (m && a) setName(a, n, m); }
   } catch (e) { /* the models stay as the sample shows them */ }
 }
@@ -429,7 +430,7 @@ async function loadModels() {
   const slow = setTimeout(() => say('Still connecting, the dashboard is slow to answer'), 7000);
   // Sample data is only for the page opened on its own (no dashboard behind it). With a dashboard, the loader stays until the real data arrives.
   for (let tries = 0; ; tries++) {
-    try { await pollLive(); clearTimeout(slow); hideBoot(); loadModels(); setInterval(() => pollLive().catch(() => { if (noteEl) noteEl.textContent = 'Live feed paused, retrying.'; }), 4000); return; }
+    try { await pollLive(); clearTimeout(slow); hideBoot(); loadModels(); loadUsed(); setInterval(loadUsed, 10000); setInterval(() => pollLive().catch(() => { if (noteEl) noteEl.textContent = 'Live feed paused, retrying.'; }), 4000); return; }
     catch (e) {
       if (e instanceof TypeError || / (404|405)$/.test(String(e && e.message))) { clearTimeout(slow); hideBoot(); for (let i = 0; i < 5; i++) logLine(); sampleTimer = setInterval(logLine, 4500); return; }
       if (tries >= 3) say('Could not read your fleet yet (' + String(e && e.message || e).slice(0, 80) + '). Retrying...');
@@ -449,13 +450,27 @@ function sayTo(a, text) { if (a.say.textContent === text) return; a.say.textCont
 const card = document.getElementById('card'); let hotA = null, pinA = null, downAt = null;
 const MODE_LABEL = { typing: 'Working', idle: 'Idle', sleep: 'Asleep', hand: 'Needs your answer', walk: 'On the move' };
 function pickAgent(x, y) { let best = null, bd = 56 * 56; for (const a of agents) { v.set(a.p.position.x, a.top * 0.55, a.p.position.z).project(camera); if (v.z > 1) continue; const px = (v.x * 0.5 + 0.5) * innerWidth, py = (-v.y * 0.5 + 0.5) * innerHeight, d = (px - x) ** 2 + (py - y) ** 2; if (d < bd) { bd = d; best = a; } } return best; }
+// the model an agent uses: what its ticket's worker was started with (the dispatcher's ledger), what the router session reports,
+// else what the global layer sets for its role. Never blank: "not reported" says so.
+let usedData = null, usedModels = null;
+function modelFor(a) {
+  const n = a.o.name, U = usedData || {}, M = usedModels || {};
+  if (n === 'You') return ['none, this is you', ''];
+  if (/^worker/.test(n) && a.project && a.ticketNum) { const e = (U.workers || {})[a.project + '/' + a.ticketNum]; if (e && e.model) return [e.model, 'in use']; }
+  if (n === 'router' && M.router && M.router.model) return [M.router.model, 'in use'];
+  if ((n === 'tester' || n === 'reviewer') && M.tickets) for (const t of Object.keys(M.tickets)) { const e = (M.tickets[t] || []).find(x => String(x.agent).indexOf(n) >= 0); if (e && e.model) return [e.model, 'in use']; }
+  const role = n.replace(/ [0-9]+$/, ''), r = (U.roles || {})[role]; if (r && r.model) return [r.model, 'configured' + (r.source ? ' (' + r.source + ')' : '')];
+  if (roleModel[role]) return [roleModel[role], 'configured'];
+  return ['not reported', ''];
+}
+async function loadUsed() { try { usedData = await api('/api/wv/agent-used'); } catch (e) { /* the card falls back to the roster */ } try { usedModels = await api('/api/wv/agent-models'); } catch (e) { /* idem */ } }
 function paintCard() {
   const a = pinA || hotA; card.classList.toggle('on', !!a);
   for (const x of agents) x.lbl.classList.toggle('hot', x === a);
   if (!a) return; card.textContent = '';
   const nm = a.lbl.querySelector('.name'), mk = (tag, text, cls) => { const e = document.createElement(tag); e.textContent = text; if (cls) e.className = cls; return e; };
   const ol = document.createElement('ol'); (a.hist || []).slice(1).forEach(t => ol.append(mk('li', t)));
-  card.append(mk('h2', nm.childNodes[0] ? nm.childNodes[0].textContent : a.o.name), mk('div', (nm.querySelector('small') || {}).textContent ? nm.querySelector('small').textContent + ' · ' + (MODE_LABEL[a.p.userData.mode] || '') : (MODE_LABEL[a.p.userData.mode] || ''), 'sub'), ...(a.detail ? [mk('div', a.detail, 'sub')] : []), mk('p', a.say.textContent || 'Nothing yet', 'now'), ol, mk('div', pinA ? 'Pinned. Click empty space or press Esc to close.' : 'Click to keep this open.', 'hintx'));
+  card.append(mk('h2', nm.childNodes[0] ? nm.childNodes[0].textContent : a.o.name), mk('div', (nm.querySelector('small') || {}).textContent ? nm.querySelector('small').textContent + ' · ' + (MODE_LABEL[a.p.userData.mode] || '') : (MODE_LABEL[a.p.userData.mode] || ''), 'sub'), ...(a.detail ? [mk('div', a.detail, 'sub')] : []), (() => { const [m, note] = modelFor(a), d = document.createElement('div'); d.className = 'model'; const b = document.createElement('b'); b.textContent = 'Model: '; d.append(b, document.createTextNode(m + (note ? ' · ' + note : ''))); return d; })(), mk('p', a.say.textContent || 'Nothing yet', 'now'), ol, mk('div', pinA ? 'Pinned. Click empty space or press Esc to close.' : 'Click to keep this open.', 'hintx'));
 }
 renderer.domElement.addEventListener('pointermove', e => { if (drag) return; const a = pickAgent(e.clientX, e.clientY); if (a !== hotA) { hotA = a; paintCard(); } renderer.domElement.style.cursor = a ? 'pointer' : ''; });
 renderer.domElement.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
